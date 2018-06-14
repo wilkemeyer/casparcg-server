@@ -35,6 +35,7 @@ set(HEADERS
 
 add_executable(casparcg ${SOURCES} ${HEADERS} ${OS_SPECIFIC_SOURCES})
 add_precompiled_header(casparcg stdafx.h FORCEINCLUDE)
+add_dependencies(casparcg cgbrowserhost)
 
 add_executable(generate_docs generate_docs.cpp included_modules.h)
 target_link_libraries(generate_docs
