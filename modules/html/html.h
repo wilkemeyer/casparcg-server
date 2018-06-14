@@ -33,7 +33,6 @@ const std::string TICK_MESSAGE_NAME = "CasparCGTick";
 const std::string REMOVE_MESSAGE_NAME = "CasparCGRemove";
 const std::string LOG_MESSAGE_NAME = "CasparCGLog";
 
-bool intercept_command_line(int argc, char** argv);
 void init(core::module_dependencies dependencies);
 void uninit();
 void invoke(const std::function<void()>& func);

@@ -4,13 +4,16 @@ project (html)
 set(SOURCES
 		producer/html_cg_proxy.cpp
 		producer/html_producer.cpp
-
+		browser-app.cpp
+		browser-client.cpp
 		html.cpp
 )
 set(HEADERS
 		producer/html_cg_proxy.h
 		producer/html_producer.h
-
+		browser-app.h
+		browser-client.h
+		tbb-memory-chunk-provider.h
 		html.h
 )
 
@@ -59,7 +62,6 @@ SET_TARGET_PROPERTIES(libcef_dll_wrapper PROPERTIES INTERFACE_COMPILE_OPTIONS ""
 casparcg_add_include_statement("modules/html/html.h")
 casparcg_add_init_statement("html::init" "html")
 casparcg_add_uninit_statement("html::uninit")
-casparcg_add_command_line_arg_interceptor("html::intercept_command_line")
 casparcg_add_module_project("html")
 
 casparcg_add_runtime_dependency("${CEF_RESOURCE_PATH}/locales")

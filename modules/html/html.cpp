@@ -42,205 +42,20 @@
 
 #include <map>
 
+
 #pragma warning(push)
 #pragma warning(disable: 4458)
 #include <cef_app.h>
 #include <cef_version.h>
 #pragma warning(pop)
 
-#pragma comment(lib, "libcef.lib")
-#pragma comment(lib, "libcef_dll_wrapper.lib")
+#include "browser-app.h"
+
 
 namespace caspar { namespace html {
 
 std::unique_ptr<executor> g_cef_executor;
 
-void caspar_log(
-		const CefRefPtr<CefBrowser>& browser,
-		boost::log::trivial::severity_level level,
-		const std::string& message)
-{
-	if (browser)
-	{
-		auto msg = CefProcessMessage::Create(LOG_MESSAGE_NAME);
-		msg->GetArgumentList()->SetInt(0, level);
-		msg->GetArgumentList()->SetString(1, message);
-		browser->SendProcessMessage(PID_BROWSER, msg);
-	}
-}
-
-class remove_handler : public CefV8Handler
-{
-	CefRefPtr<CefBrowser> browser_;
-public:
-	remove_handler(CefRefPtr<CefBrowser> browser)
-		: browser_(browser)
-	{
-	}
-
-	bool Execute(
-			const CefString& name,
-			CefRefPtr<CefV8Value> object,
-			const CefV8ValueList& arguments,
-			CefRefPtr<CefV8Value>& retval,
-			CefString& exception) override
-	{
-		if (!CefCurrentlyOn(TID_RENDERER))
-			return false;
-
-		browser_->SendProcessMessage(
-				PID_BROWSER,
-				CefProcessMessage::Create(REMOVE_MESSAGE_NAME));
-
-		return true;
-	}
-
-	IMPLEMENT_REFCOUNTING(remove_handler);
-};
-
-class renderer_application : public CefApp, CefRenderProcessHandler
-{
-	std::vector<CefRefPtr<CefV8Context>> contexts_;
-public:
-	CefRefPtr<CefRenderProcessHandler> GetRenderProcessHandler() override
-	{
-		return this;
-	}
-
-	void OnContextCreated(
-			CefRefPtr<CefBrowser> browser,
-			CefRefPtr<CefFrame> frame,
-			CefRefPtr<CefV8Context> context) override
-	{
-		caspar_log(browser, boost::log::trivial::trace,
-				"context for frame "
-				+ boost::lexical_cast<std::string>(frame->GetIdentifier())
-				+ " created");
-		contexts_.push_back(context);
-
-		auto window = context->GetGlobal();
-
-		window->SetValue(
-				"remove",
-				CefV8Value::CreateFunction(
-						"remove",
-						new remove_handler(browser)),
-				V8_PROPERTY_ATTRIBUTE_NONE);
-
-		CefRefPtr<CefV8Value> ret;
-		CefRefPtr<CefV8Exception> exception;
-		bool injected = context->Eval(R"(
-			var requestedAnimationFrames	= {};
-			var currentAnimationFrameId		= 0;
-
-			window.requestAnimationFrame = function(callback) {
-				requestedAnimationFrames[++currentAnimationFrameId] = callback;
-				return currentAnimationFrameId;
-			}
-
-			window.cancelAnimationFrame = function(animationFrameId) {
-				delete requestedAnimationFrames[animationFrameId];
-			}
-
-			function tickAnimations() {
-				var requestedFrames = requestedAnimationFrames;
-				var timestamp = performance.now();
-				requestedAnimationFrames = {};
-
-				for (var animationFrameId in requestedFrames)
-					if (requestedFrames.hasOwnProperty(animationFrameId))
-						requestedFrames[animationFrameId](timestamp);
-			}
-		)", CefString(), 1, ret, exception);
-
-		if (!injected)
-			caspar_log(browser, boost::log::trivial::error, "Could not inject javascript animation code.");
-	}
-
-	void OnContextReleased(
-			CefRefPtr<CefBrowser> browser,
-			CefRefPtr<CefFrame> frame,
-			CefRefPtr<CefV8Context> context)
-	{
-		auto removed = boost::remove_if(
-				contexts_, [&](const CefRefPtr<CefV8Context>& c)
-				{
-					return c->IsSame(context);
-				});
-
-		if (removed != contexts_.end())
-			caspar_log(browser, boost::log::trivial::trace,
-					"context for frame "
-					+ boost::lexical_cast<std::string>(frame->GetIdentifier())
-					+ " released");
-		else
-			caspar_log(browser, boost::log::trivial::warning,
-					"context for frame "
-					+ boost::lexical_cast<std::string>(frame->GetIdentifier())
-					+ " released, but not found");
-	}
-
-	void OnBrowserDestroyed(CefRefPtr<CefBrowser> browser) override
-	{
-		contexts_.clear();
-	}
-
-	void OnBeforeCommandLineProcessing(
-		const CefString& process_type,
-		CefRefPtr<CefCommandLine> command_line) override
-	{
-		//command_line->AppendSwitch("ignore-gpu-blacklist");
-		//command_line->AppendSwitch("enable-webgl");
-		command_line->AppendSwitch("enable-begin-frame-scheduling");
-		command_line->AppendSwitch("enable-media-stream");
-
-		if (process_type.empty())
-		{
-			// This gives more performance, but disabled gpu effects. Without it a single 1080p producer cannot be run smoothly
-			command_line->AppendSwitch("disable-gpu");
-			command_line->AppendSwitch("disable-gpu-compositing");
-			command_line->AppendSwitchWithValue("disable-gpu-vsync", "gpu");
-		}
-	}
-
-	bool OnProcessMessageReceived(
-			CefRefPtr<CefBrowser> browser,
-			CefProcessId source_process,
-			CefRefPtr<CefProcessMessage> message) override
-	{
-		if (message->GetName().ToString() == TICK_MESSAGE_NAME)
-		{
-			for (auto& context : contexts_)
-			{
-				CefRefPtr<CefV8Value> ret;
-				CefRefPtr<CefV8Exception> exception;
-				context->Eval("tickAnimations()", CefString(), 1, ret, exception);
-			}
-
-			return true;
-		}
-		else
-		{
-			return false;
-		}
-	}
-
-	IMPLEMENT_REFCOUNTING(renderer_application);
-};
-
-bool intercept_command_line(int argc, char** argv)
-{
-#ifdef _WIN32
-	CefMainArgs main_args;
-#else
-	CefMainArgs main_args(argc, argv);
-#endif
-
-	if (CefExecuteProcess(main_args, CefRefPtr<CefApp>(new renderer_application), nullptr) >= 0)
-		return true;
-
-	return false;
-}
 
 void init(core::module_dependencies dependencies)
 {
@@ -255,7 +70,7 @@ void init(core::module_dependencies dependencies)
 		settings.remote_debugging_port = env::properties().get(L"configuration.html.remote-debugging-port", 0);
 		settings.windowless_rendering_enabled = true;
 		CefString(&settings.browser_subprocess_path).FromASCII("cgbrowserhost.exe");
-		CefInitialize(main_args, settings, CefRefPtr<CefApp>(new renderer_application), nullptr);
+		CefInitialize(main_args, settings, CefRefPtr<CefApp>(new browserApp), nullptr);
 	});
 	g_cef_executor->begin_invoke([&]
 	{
