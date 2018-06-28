@@ -42,10 +42,20 @@ void browserClient::close() {
 		if (m_browser != nullptr) {
 			m_browser->GetHost()->CloseBrowser(true);
 		}
+		else {
+			printf("->>> CLOSE BEFORE AFTER CREATE WAS DONE\n");
+		}
 	});
 
 }//end: close()
 
+void browserClient::remove() {
+	printf("-> REMOVE! (browserClient)\n");
+
+	close();
+	m_removed.store(true);
+
+}//end: remove()
 
 
 bool browserClient::OnProcessMessageReceived(
@@ -53,8 +63,16 @@ bool browserClient::OnProcessMessageReceived(
 	CefProcessId source_process,
 	CefRefPtr<CefProcessMessage> message) {
 
+	auto name = message->GetName().ToString();
 
-	printf("-> OnProcessMessageReceived\n");
+	if (name == REMOVE_MESSAGE_NAME) {
+		// REMOVE MESSAGE
+		//
+		printf("Remove task! - sad.\n");
+		this->remove();
+		return true;
+	}
+
 	// @TODO
 	return false;
 
@@ -91,7 +109,8 @@ void browserClient::OnPaint(CefRefPtr<CefBrowser> browser,
 	// Take care about pending frames in queue 
 	if (m_rawframequeue.queue.size() > cMaxNumInRawQueue) {
 
-		printf("-> Dropped one frame as queue already contains > %u frames\n", (unsigned int)cMaxNumInRawQueue);
+		// Will happen quite often, commented out verbose info.
+		//  printf("-> Dropped one frame as queue already contains > %u frames\n", (unsigned int)cMaxNumInRawQueue);
 		
 		auto oldframe = m_rawframequeue.queue.back();
 		m_rawframeallocator.free(oldframe);
@@ -110,6 +129,8 @@ void browserClient::OnPaint(CefRefPtr<CefBrowser> browser,
 
 core::draw_frame browserClient::getFrame() {
 	framequeue::frame *rawframe;
+
+	invoke_requested_animation_frames();
 
 	m_rawframequeue.lock.lock(); // @TODO -> trylock!
 	size_t queueSize = m_rawframequeue.queue.size();
@@ -144,6 +165,15 @@ core::draw_frame browserClient::getFrame() {
 }//end: getFrame()
 
 
+void browserClient::invoke_requested_animation_frames() {
+
+	if (m_browser) {
+		m_browser->SendProcessMessage(CefProcessId::PID_RENDERER, CefProcessMessage::Create(TICK_MESSAGE_NAME));
+	}
+
+}//end: invoke_requested_animation_frames()
+
+
 bool browserClient::OnBeforePopup (
 	CefRefPtr<CefBrowser> browser,
 	CefRefPtr<CefFrame> frame,
@@ -165,6 +195,7 @@ bool browserClient::OnBeforePopup (
 
 
 void browserClient::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
+	printf(" -> OnAfterCrated\n");
 	m_browser = browser;
 }//end: OnAfterCreated() (CefLifeSpanhandler)
 

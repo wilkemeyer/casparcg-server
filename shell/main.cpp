@@ -268,6 +268,9 @@ void on_abort(int)
 
 int main(int argc, char** argv)
 {
+	if (intercept_command_line_args(argc, argv))
+		return 0;
+
 	int return_code = 0;
 	setup_prerequisites();
 	//std::signal(SIGABRT, on_abort);

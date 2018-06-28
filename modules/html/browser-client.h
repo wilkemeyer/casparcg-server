@@ -86,13 +86,17 @@ public:
 	// Closes this browser view
 	void close();
 	
+	// Queue/Schedule removal of this view.
+	void remove(); 
+
 	// is removed?
 	bool is_removed();
 
 	// Recieves a frame from it's internal frame queue
 	core::draw_frame getFrame();
 
-
+	// Invokes 'requestAnimationframe()' on the browses; in order to force-update the view
+	void invoke_requested_animation_frames();
 
 	//
 	// CefClient

@@ -113,6 +113,7 @@ public:
 
 	~html_producer()
 	{
+		printf(" -> destroy html_producer!\n");
 		if (client_)
 			client_->close();
 	}
@@ -194,7 +195,7 @@ public:
 
 	std::future<std::wstring> call(const std::vector<std::wstring>& params) override
 	{
-		wprintf(L"Call: %s\n", params.at(0).c_str());
+		//wprintf(L"Call: %s\n", params.at(0).c_str());
 		if (!client_)
 			return make_ready_future(std::wstring(L""));
 

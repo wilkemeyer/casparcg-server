@@ -60,16 +60,19 @@ void html_cg_proxy::add(
 
 void html_cg_proxy::remove(int layer)
 {
+	printf("Proxy -> Remove\n");
 	impl_->producer->call({ L"remove()" });
 }
 
 void html_cg_proxy::play(int layer)
 {
+	printf("Proxy -> Play\n");
 	impl_->producer->call({ L"play()" });
 }
 
 void html_cg_proxy::stop(int layer, unsigned int mix_out_duration)
 {
+	printf("Proxy -> Stop\n");
 	impl_->producer->call({ L"stop()" });
 }
 
@@ -80,6 +83,7 @@ void html_cg_proxy::next(int layer)
 
 void html_cg_proxy::update(int layer, const std::wstring& data)
 {
+	printf("Proxy -> Update\n");
 	impl_->producer->call({ (boost::wformat(L"update(\"%1%\")") % boost::algorithm::replace_all_copy(boost::algorithm::trim_copy_if(data, boost::is_any_of(" \"")), "\"", "\\\"")).str() });
 }
 

@@ -132,6 +132,14 @@ function(casparcg_add_uninit_statement UNINIT_FUNCTION_NAME)
 			CACHE INTERNAL "")
 endfunction()
 
+function(casparcg_add_command_line_arg_interceptor INTERCEPTOR_FUNCTION_NAME)
+	set(CASPARCG_MODULE_COMMAND_LINE_ARG_INTERCEPTORS_STATEMENTS "${CASPARCG_MODULE_COMMAND_LINE_ARG_INTERCEPTORS_STATEMENTS}"
+			"	if (${INTERCEPTOR_FUNCTION_NAME}(argc, argv))"
+			"		return true\;"
+			""
+			CACHE INTERNAL "")
+endfunction()
+
 function(casparcg_add_module_project PROJECT)
 	set(CASPARCG_MODULE_PROJECTS "${CASPARCG_MODULE_PROJECTS}" "${PROJECT}" CACHE INTERNAL "")
 endfunction()

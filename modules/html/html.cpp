@@ -56,6 +56,20 @@ namespace caspar { namespace html {
 
 std::unique_ptr<executor> g_cef_executor;
 
+bool intercept_command_line(int argc, char** argv)
+{
+#ifdef _WIN32
+	CefMainArgs main_args;
+#else
+	CefMainArgs main_args(argc, argv);
+#endif
+
+	if (CefExecuteProcess(main_args, CefRefPtr<CefApp>(new browserApp), nullptr) >= 0)
+		return true;
+
+	return false;
+}
+
 
 void init(core::module_dependencies dependencies)
 {
@@ -69,7 +83,8 @@ void init(core::module_dependencies dependencies)
 		settings.no_sandbox = true;
 		settings.remote_debugging_port = env::properties().get(L"configuration.html.remote-debugging-port", 0);
 		settings.windowless_rendering_enabled = true;
-		CefString(&settings.browser_subprocess_path).FromASCII("cgbrowserhost.exe");
+		// CefString(&settings.browser_subprocess_path).FromASCII("cgbrowserhost.exe"); // Currently Disabled, as the subprocess needs the browserApp implementation, or 
+																						// at least a stripped down version for IPC.
 		CefInitialize(main_args, settings, CefRefPtr<CefApp>(new browserApp), nullptr);
 	});
 	g_cef_executor->begin_invoke([&]

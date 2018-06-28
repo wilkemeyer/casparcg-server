@@ -72,16 +72,16 @@ void browserApp::OnRegisterCustomSchemes(CefRawPtr<CefSchemeRegistrar> registrar
 
 
 void browserApp::OnBeforeCommandLineProcessing(const CefString &process_type, CefRefPtr<CefCommandLine> command_line) {
-	printf("->OnBeforeCommandLineProcessing\n");
 
 	command_line->AppendSwitch("enable-begin-frame-scheduling");
 	command_line->AppendSwitch("enable-media-stream");
 
-	//if (process_type.empty()) {
+	if (process_type.empty()) {
+
 		command_line->AppendSwitch("disable-gpu");
 		command_line->AppendSwitch("disable-gpu-compositing");
 		command_line->AppendSwitchWithValue("disable-gpu-vsync", "gpu");
-	//}
+	}
 }
 
 
@@ -100,8 +100,33 @@ void browserApp::OnContextCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFr
 		new remove_handler(browser)),
 		V8_PROPERTY_ATTRIBUTE_NONE);
 
-	// @ TODO -> Animation Frame stuff
+	CefRefPtr<CefV8Value> ret;
+	CefRefPtr<CefV8Exception> exception;
+	bool injected = context->Eval(R"(
+			var requestedAnimationFrames	= {};
+			var currentAnimationFrameId		= 0;
+			window.requestAnimationFrame = function(callback) {
+				requestedAnimationFrames[++currentAnimationFrameId] = callback;
+				return currentAnimationFrameId;
+			}
 
+			window.cancelAnimationFrame = function(animationFrameId) {
+				delete requestedAnimationFrames[animationFrameId];
+			}
+
+			function tickAnimations() {
+				var requestedFrames = requestedAnimationFrames;
+				var timestamp = performance.now();
+				requestedAnimationFrames = {};
+				for (var animationFrameId in requestedFrames)
+					if (requestedFrames.hasOwnProperty(animationFrameId))
+						requestedFrames[animationFrameId](timestamp);
+			}
+		)", CefString(), 0, ret, exception);
+
+	if (injected != true) {
+		caspar_log(browser, boost::log::trivial::error, "Cannot inject js animation code.");
+	}
 
 }//end: OnContextCreated()
 
@@ -125,9 +150,29 @@ void browserApp::OnBrowserDestroyed(CefRefPtr<CefBrowser> browser) {
 }//end: OnBrowserDestroyed()
 
 
+
 bool browserApp::OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefProcessId source_process, CefRefPtr<CefProcessMessage> message) {
-	printf("@App OnProcessMessageReceived\n");
+	//printf("@App OnProcessMessageReceived %s\n", message->GetName().ToString().c_str());
 	// Used as messagebus handler to process messages sent by externel code or views
+
+	auto name = message->GetName().ToString();
+
+	if (name == TICK_MESSAGE_NAME) {
+		// Tick all animations 
+
+		for (auto &it : m_contexts) {
+			CefRefPtr<CefV8Value> ret;
+			CefRefPtr<CefV8Exception> ex;
+
+			auto bRet = it->Eval("tickAnimations();", CefString(), 0, ret, ex);
+			if (bRet != true) {
+				caspar_log(browser, boost::log::trivial::warning, "Failed to tickAnimations();");
+			}
+		}
+
+		return true;
+	}
+
 
 	return false;
 }
