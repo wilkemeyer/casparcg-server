@@ -80,7 +80,11 @@ void browserApp::OnBeforeCommandLineProcessing(const CefString &process_type, Ce
 
 		command_line->AppendSwitch("disable-gpu");
 		command_line->AppendSwitch("disable-gpu-compositing");
-		command_line->AppendSwitchWithValue("disable-gpu-vsync", "gpu");
+		command_line->AppendSwitch("disable-d3d11");
+
+		// Breaks stuff currently - needs further invistagation on CeF Patches && Chrome
+		// As when disabling vsync, with offscreen rendering OnPaint won't get called..
+		//command_line->AppendSwitchWithValue("disable-gpu-vsync", "gpu");
 	}
 }
 

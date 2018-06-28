@@ -16,13 +16,13 @@ browserClient::browserClient(spl::shared_ptr<core::frame_factory> frame_factory,
 	m_removed.store(false);
 	m_loaded.store(false);
 
-	printf("-> CONSTRUCT\n");
+	//printf("-> CONSTRUCT\n");
 
 }//end: constructor
 
 
 browserClient::~browserClient() {
-	printf("-> DESTRUCT\n");
+	//printf("-> DESTRUCT\n");
 
 
 	m_rawframequeue.queue.clear();
@@ -36,7 +36,7 @@ bool browserClient::is_removed() {
 }//end: is_removed()
 
 void browserClient::close() {
-	printf("-> CLOSE\n");
+	//printf("-> CLOSE\n");
 
 	html::invoke([=] {
 		if (m_browser != nullptr) {
@@ -50,7 +50,7 @@ void browserClient::close() {
 }//end: close()
 
 void browserClient::remove() {
-	printf("-> REMOVE! (browserClient)\n");
+//	printf("-> REMOVE! (browserClient)\n");
 
 	close();
 	m_removed.store(true);
@@ -68,7 +68,7 @@ bool browserClient::OnProcessMessageReceived(
 	if (name == REMOVE_MESSAGE_NAME) {
 		// REMOVE MESSAGE
 		//
-		printf("Remove task! - sad.\n");
+		
 		this->remove();
 		return true;
 	}
@@ -94,8 +94,7 @@ void browserClient::OnPaint(CefRefPtr<CefBrowser> browser,
 							const void *buffer,
 							int width,
 							int height) {
-	
-	// @TODO Replace allocator
+
 	size_t rgba_length = width * height * 4;
 	auto frame = m_rawframeallocator.alloc(rgba_length);
 	
@@ -122,7 +121,6 @@ void browserClient::OnPaint(CefRefPtr<CefBrowser> browser,
 	m_rawframequeue.queue.push_back(frame);
 
 	m_rawframequeue.lock.unlock();
-
 
 }//end: OnPaint (CefRenderHandler)
 
@@ -188,14 +186,14 @@ bool browserClient::OnBeforePopup (
 	bool *no_javascript_access) {
 
 
-	printf(" -> OnBeforePopup\n");
+	//printf(" -> OnBeforePopup\n");
 	// Block Popups
 	return true;
 }//end: OnBeforePopup (CefLifeSpanHandler)
 
 
 void browserClient::OnAfterCreated(CefRefPtr<CefBrowser> browser) {
-	printf(" -> OnAfterCrated\n");
+	//printf(" -> OnAfterCrated\n");
 	m_browser = browser;
 }//end: OnAfterCreated() (CefLifeSpanhandler)
 
@@ -205,7 +203,7 @@ void browserClient::OnLoadEnd(
 	CefRefPtr<CefFrame> frame,
 	int httpStatusCode) {
 
-	printf("-> On Load end!!\n");
+	//printf("-> On Load end!!\n");
 
 	m_loaded.store(true);
 
