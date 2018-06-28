@@ -136,6 +136,8 @@ set(LIBCEF_CPPTOC_SRCS
   cpptoc/urlrequest_client_cpptoc.h
   cpptoc/v8accessor_cpptoc.cc
   cpptoc/v8accessor_cpptoc.h
+  cpptoc/v8array_buffer_release_callback_cpptoc.cc
+  cpptoc/v8array_buffer_release_callback_cpptoc.h
   cpptoc/v8handler_cpptoc.cc
   cpptoc/v8handler_cpptoc.h
   cpptoc/v8interceptor_cpptoc.cc

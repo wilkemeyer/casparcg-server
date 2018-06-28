@@ -1,4 +1,4 @@
-mirrorsÊ
+mirrorsÍÔ
 (function(a,b){
 "use strict";
 var c=a.Array;
@@ -55,10 +55,10 @@ l=new DateMirror(k);
 l=new FunctionMirror(k);
 }else if(%IsRegExp(k)){
 l=new RegExpMirror(k);
-}else if((%_ClassOf(k)==='Error')
+}else if((%IsJSError(k))
 ){
 l=new ErrorMirror(k);
-}else if((%_ClassOf(k)==='Script')
+}else if((%IsScriptWrapper(k))
 ){
 l=new ScriptMirror(k);
 }else if((%_IsJSMap(k))
@@ -67,13 +67,13 @@ l=new MapMirror(k);
 }else if((%_IsJSSet(k))
 ||(%_IsJSWeakSet(k))){
 l=new SetMirror(k);
-}else if((%_ClassOf(k)==='Map Iterator')
-||(%_ClassOf(k)==='Set Iterator')
+}else if((%IsJSMapIterator(k))
+||(%IsJSSetIterator(k))
 ){
 l=new IteratorMirror(k);
 }else if(%is_promise(k)){
 l=new PromiseMirror(k);
-}else if((%_ClassOf(k)==='Generator')
+}else if((%IsJSGeneratorObject(k))
 ){
 l=new GeneratorMirror(k);
 }else{
@@ -272,7 +272,7 @@ t=t||j.OBJECT_TYPE;
 }
 inherits(ObjectMirror,ValueMirror);
 ObjectMirror.prototype.className=function(){
-return %_ClassOf(this.value_);
+return %ClassOf(this.value_);
 };
 ObjectMirror.prototype.constructorFunction=function(){
 return MakeMirror(%DebugGetProperty(this.value_,'constructor'));
@@ -611,12 +611,12 @@ function IteratorMirror(k){
 }
 inherits(IteratorMirror,ObjectMirror);
 IteratorMirror.prototype.preview=function(P){
-if((%_ClassOf(this.value_)==='Map Iterator')
+if((%IsJSMapIterator(this.value_))
 ){
 return IteratorGetValues_(%MapIteratorClone(this.value_),
 g,
 P);
-}else if((%_ClassOf(this.value_)==='Set Iterator')
+}else if((%IsJSSetIterator(this.value_))
 ){
 return IteratorGetValues_(%SetIteratorClone(this.value_),
 h,
@@ -1253,7 +1253,7 @@ ScriptMirror.prototype.value=function(){
 return this.script_;
 };
 ScriptMirror.prototype.name=function(){
-return this.script_.name||this.script_.nameOrSourceURL();
+return this.script_.name||this.script_.source_url;
 };
 ScriptMirror.prototype.id=function(){
 return this.script_.id;
@@ -1285,7 +1285,7 @@ return %ScriptLineCount(this.script_);
 };
 ScriptMirror.prototype.locationFromPosition=function(
 position,include_resource_offset){
-return this.script_.locationFromPosition(position,include_resource_offset);
+return %ScriptPositionInfo(this.script_,position,!!include_resource_offset);
 };
 ScriptMirror.prototype.context=function(){
 return this.context_;
@@ -1359,7 +1359,7 @@ b.InstallConstants(a,[
 ]);
 })
 
-debugÓ
+debugπU
 (function(a,b){
 "use strict";
 var c=a.FrameMirror;
@@ -1370,616 +1370,176 @@ var g=a.MakeMirror;
 var h=a.Math.min;
 var i=a.Mirror;
 var j=a.ValueMirror;
-var k=10;
-var l={};
-var m=/^(?:\s*(?:\/\*.*?\*\/)*)*/;
-l.DebugEvent={Break:1,
+var k={};
+k.DebugEvent={Break:1,
 Exception:2,
 AfterCompile:3,
 CompileError:4,
 AsyncTaskEvent:5};
-l.ExceptionBreak={Caught:0,
+k.ExceptionBreak={Caught:0,
 Uncaught:1};
-l.StepAction={StepOut:0,
+k.StepAction={StepOut:0,
 StepNext:1,
 StepIn:2};
-l.ScriptType={Native:0,
+k.ScriptType={Native:0,
 Extension:1,
 Normal:2,
 Wasm:3};
-l.ScriptCompilationType={Host:0,
+k.ScriptCompilationType={Host:0,
 Eval:1,
 JSON:2};
-l.ScriptBreakPointType={ScriptId:0,
-ScriptName:1,
-ScriptRegExp:2};
-function ScriptTypeFlag(n){
-return(1<<n);
+function ScriptTypeFlag(l){
+return(1<<l);
 }
-var o=0;
-var p=1;
-var q=[];
-var r=[];
-var s={
-breakPointsActive:{
-value:true,
-getValue:function(){return this.value;},
-setValue:function(t){
-this.value=!!t;
-%SetBreakPointsActive(this.value);
-}
-},
+var m={
 breakOnCaughtException:{
-getValue:function(){return l.isBreakOnException();},
-setValue:function(t){
-if(t){
-l.setBreakOnException();
+getValue:function(){return k.isBreakOnException();},
+setValue:function(n){
+if(n){
+k.setBreakOnException();
 }else{
-l.clearBreakOnException();
+k.clearBreakOnException();
 }
 }
 },
 breakOnUncaughtException:{
-getValue:function(){return l.isBreakOnUncaughtException();},
-setValue:function(t){
-if(t){
-l.setBreakOnUncaughtException();
+getValue:function(){return k.isBreakOnUncaughtException();},
+setValue:function(n){
+if(n){
+k.setBreakOnUncaughtException();
 }else{
-l.clearBreakOnUncaughtException();
+k.clearBreakOnUncaughtException();
 }
 }
 },
 };
-function MakeBreakPoint(u,v){
-var w=new BreakPoint(u,v);
-q.push(w);
-return w;
-}
-function BreakPoint(u,v){
-this.source_position_=u;
-if(v){
-this.script_break_point_=v;
-}else{
-this.number_=p++;
-}
-this.active_=true;
-this.condition_=null;
-}
-BreakPoint.prototype.number=function(){
-return this.number_;
-};
-BreakPoint.prototype.func=function(){
-return this.func_;
-};
-BreakPoint.prototype.source_position=function(){
-return this.source_position_;
-};
-BreakPoint.prototype.active=function(){
-if(this.script_break_point()){
-return this.script_break_point().active();
-}
-return this.active_;
-};
-BreakPoint.prototype.condition=function(){
-if(this.script_break_point()&&this.script_break_point().condition()){
-return this.script_break_point().condition();
-}
-return this.condition_;
-};
-BreakPoint.prototype.script_break_point=function(){
-return this.script_break_point_;
-};
-BreakPoint.prototype.enable=function(){
-this.active_=true;
-};
-BreakPoint.prototype.disable=function(){
-this.active_=false;
-};
-BreakPoint.prototype.setCondition=function(x){
-this.condition_=x;
-};
-BreakPoint.prototype.isTriggered=function(y){
-if(!this.active())return false;
-if(this.condition()){
-try{
-var z=y.frame(0).evaluate(this.condition());
-if(!(z instanceof j)||!z.value_){
-return false;
-}
-}catch(e){
-return false;
+k.findScript=function(o){
+if((%IsFunction(o))){
+return %FunctionGetScript(o);
+}else if(%IsRegExp(o)){
+var p=this.scripts();
+var q=null;
+var r=0;
+for(var s in p){
+var t=p[s];
+if(o.test(t.name)){
+q=t;
+r++;
 }
 }
-return true;
-};
-function IsBreakPointTriggered(A,w){
-return w.isTriggered(MakeExecutionState(A));
-}
-function ScriptBreakPoint(n,script_id_or_name,opt_line,opt_column,
-opt_groupId){
-this.type_=n;
-if(n==l.ScriptBreakPointType.ScriptId){
-this.script_id_=script_id_or_name;
-}else if(n==l.ScriptBreakPointType.ScriptName){
-this.script_name_=script_id_or_name;
-}else if(n==l.ScriptBreakPointType.ScriptRegExp){
-this.script_regexp_object_=new e(script_id_or_name);
-}else{
-throw %make_error(2,"Unexpected breakpoint type "+n);
-}
-this.line_=opt_line||0;
-this.column_=opt_column;
-this.groupId_=opt_groupId;
-this.active_=true;
-this.condition_=null;
-this.break_points_=[];
-}
-ScriptBreakPoint.prototype.number=function(){
-return this.number_;
-};
-ScriptBreakPoint.prototype.groupId=function(){
-return this.groupId_;
-};
-ScriptBreakPoint.prototype.type=function(){
-return this.type_;
-};
-ScriptBreakPoint.prototype.script_id=function(){
-return this.script_id_;
-};
-ScriptBreakPoint.prototype.script_name=function(){
-return this.script_name_;
-};
-ScriptBreakPoint.prototype.script_regexp_object=function(){
-return this.script_regexp_object_;
-};
-ScriptBreakPoint.prototype.line=function(){
-return this.line_;
-};
-ScriptBreakPoint.prototype.column=function(){
-return this.column_;
-};
-ScriptBreakPoint.prototype.actual_locations=function(){
-var B=[];
-for(var C=0;C<this.break_points_.length;C++){
-B.push(this.break_points_[C].actual_location);
-}
-return B;
-};
-ScriptBreakPoint.prototype.update_positions=function(D,E){
-this.line_=D;
-this.column_=E;
-};
-ScriptBreakPoint.prototype.active=function(){
-return this.active_;
-};
-ScriptBreakPoint.prototype.condition=function(){
-return this.condition_;
-};
-ScriptBreakPoint.prototype.enable=function(){
-this.active_=true;
-};
-ScriptBreakPoint.prototype.disable=function(){
-this.active_=false;
-};
-ScriptBreakPoint.prototype.setCondition=function(x){
-this.condition_=x;
-};
-ScriptBreakPoint.prototype.matchesScript=function(F){
-if(this.type_==l.ScriptBreakPointType.ScriptId){
-return this.script_id_==F.id;
-}else{
-if(!(F.line_offset<=this.line_&&
-this.line_<F.line_offset+%ScriptLineCount(F))){
-return false;
-}
-if(this.type_==l.ScriptBreakPointType.ScriptName){
-return this.script_name_==F.nameOrSourceURL();
-}else if(this.type_==l.ScriptBreakPointType.ScriptRegExp){
-return this.script_regexp_object_.test(F.nameOrSourceURL());
-}else{
-throw %make_error(2,"Unexpected breakpoint type "+this.type_);
-}
-}
-};
-ScriptBreakPoint.prototype.set=function(F){
-var E=this.column();
-var D=this.line();
-if((E===(void 0))){
-var G=%ScriptSourceLine(F,D||F.line_offset);
-if(!F.sourceColumnStart_){
-F.sourceColumnStart_=new d(%ScriptLineCount(F));
-}
-if((F.sourceColumnStart_[D]===(void 0))){
-F.sourceColumnStart_[D]=
-G.match(m)[0].length;
-}
-E=F.sourceColumnStart_[D];
-}
-var H=l.findScriptSourcePosition(F,this.line(),E);
-if((H===null))return;
-var w=MakeBreakPoint(H,this);
-var I=%SetScriptBreakPoint(F,H,
-w);
-if((I===(void 0))){
-I=H;
-}
-var J=F.locationFromPosition(I,true);
-w.actual_location={line:J.line,
-column:J.column,
-script_id:F.id};
-this.break_points_.push(w);
-return w;
-};
-ScriptBreakPoint.prototype.clear=function(){
-var K=[];
-for(var C=0;C<q.length;C++){
-if(q[C].script_break_point()&&
-q[C].script_break_point()===this){
-%ClearBreakPoint(q[C]);
-}else{
-K.push(q[C]);
-}
-}
-q=K;
-this.break_points_=[];
-};
-l.setListener=function(L,M){
-if(!(%IsFunction(L))&&!(L===(void 0))&&!(L===null)){
-throw %make_type_error(46);
-}
-%SetDebugEventListener(L,M);
-};
-l.findScript=function(N){
-if((%IsFunction(N))){
-return %FunctionGetScript(N);
-}else if(%IsRegExp(N)){
-var O=this.scripts();
-var P=null;
-var Q=0;
-for(var C in O){
-var F=O[C];
-if(N.test(F.name)){
-P=F;
-Q++;
-}
-}
-if(Q==1){
-return P;
+if(r==1){
+return q;
 }else{
 return(void 0);
 }
 }else{
-return %GetScript(N);
+return %GetScript(o);
 }
 };
-l.scriptSource=function(N){
-return this.findScript(N).source;
+k.scriptSource=function(o){
+return this.findScript(o).source;
 };
-l.source=function(R){
-if(!(%IsFunction(R)))throw %make_type_error(46);
-return %FunctionGetSourceCode(R);
+k.source=function(u){
+if(!(%IsFunction(u)))throw %make_type_error(47);
+return %FunctionGetSourceCode(u);
 };
-l.sourcePosition=function(R){
-if(!(%IsFunction(R)))throw %make_type_error(46);
-return %FunctionGetScriptSourcePosition(R);
+k.sourcePosition=function(u){
+if(!(%IsFunction(u)))throw %make_type_error(47);
+return %FunctionGetScriptSourcePosition(u);
 };
-l.findFunctionSourceLocation=function(S,T,U){
-var F=%FunctionGetScript(S);
-var V=%FunctionGetScriptSourcePosition(S);
-return %ScriptLocationFromLine(F,T,U,V);
+k.findFunctionSourceLocation=function(v,w,x){
+var t=%FunctionGetScript(v);
+var y=%FunctionGetScriptSourcePosition(v);
+return %ScriptLocationFromLine(t,w,x,y);
 };
-l.findScriptSourcePosition=function(F,T,U){
-var W=%ScriptLocationFromLine(F,T,U,0);
-return W?W.position:null;
+k.findScriptSourcePosition=function(t,w,x){
+var z=%ScriptLocationFromLine(t,w,x,0);
+return z?z.position:null;
 };
-l.findBreakPoint=function(X,Y){
-var w;
-for(var C=0;C<q.length;C++){
-if(q[C].number()==X){
-w=q[C];
-if(Y){
-q.splice(C,1);
-}
-break;
-}
-}
-if(w){
-return w;
-}else{
-return this.findScriptBreakPoint(X,Y);
-}
-};
-l.findBreakPointActualLocations=function(X){
-for(var C=0;C<r.length;C++){
-if(r[C].number()==X){
-return r[C].actual_locations();
-}
-}
-for(var C=0;C<q.length;C++){
-if(q[C].number()==X){
-return[q[C].actual_location];
-}
-}
-return[];
-};
-l.setBreakPoint=function(S,T,U,Z){
-if(!(%IsFunction(S)))throw %make_type_error(46);
-if(%FunctionIsAPIFunction(S)){
-throw %make_error(2,'Cannot set break point in native code.');
-}
-var u=
-this.findFunctionSourceLocation(S,T,U).position;
-var F=%FunctionGetScript(S);
-if(F.type==l.ScriptType.Native){
-throw %make_error(2,'Cannot set break point in native code.');
-}
-if(F&&F.id){
-var W=F.locationFromPosition(u,false);
-return this.setScriptBreakPointById(F.id,
-W.line,W.column,
-Z);
-}else{
-var w=MakeBreakPoint(u);
-var I=
-%SetFunctionBreakPoint(S,u,w);
-var J=F.locationFromPosition(I,true);
-w.actual_location={line:J.line,
-column:J.column,
-script_id:F.id};
-w.setCondition(Z);
-return w.number();
-}
-};
-l.setBreakPointByScriptIdAndPosition=function(script_id,H,
-x,enabled)
-{
-var w=MakeBreakPoint(H);
-w.setCondition(x);
-if(!enabled){
-w.disable();
-}
-var F=scriptById(script_id);
-if(F){
-w.actual_position=%SetScriptBreakPoint(F,H,w);
-}
-return w;
-};
-l.enableBreakPoint=function(X){
-var w=this.findBreakPoint(X,false);
-if(w){
-w.enable();
-}
-};
-l.disableBreakPoint=function(X){
-var w=this.findBreakPoint(X,false);
-if(w){
-w.disable();
-}
-};
-l.changeBreakPointCondition=function(X,x){
-var w=this.findBreakPoint(X,false);
-w.setCondition(x);
-};
-l.clearBreakPoint=function(X){
-var w=this.findBreakPoint(X,true);
-if(w){
-return %ClearBreakPoint(w);
-}else{
-w=this.findScriptBreakPoint(X,true);
-if(!w)throw %make_error(2,'Invalid breakpoint');
-}
-};
-l.clearAllBreakPoints=function(){
-for(var C=0;C<q.length;C++){
-var w=q[C];
-%ClearBreakPoint(w);
-}
-q=[];
-};
-l.disableAllBreakPoints=function(){
-for(var C=1;C<p;C++){
-l.disableBreakPoint(C);
-}
-%ChangeBreakOnException(l.ExceptionBreak.Caught,false);
-%ChangeBreakOnException(l.ExceptionBreak.Uncaught,false);
-};
-l.findScriptBreakPoint=function(X,Y){
-var aa;
-for(var C=0;C<r.length;C++){
-if(r[C].number()==X){
-aa=r[C];
-if(Y){
-aa.clear();
-r.splice(C,1);
-}
-break;
-}
-}
-return aa;
-};
-l.setScriptBreakPoint=function(n,script_id_or_name,
-T,U,Z,
-opt_groupId){
-var aa=
-new ScriptBreakPoint(n,script_id_or_name,T,U,
-opt_groupId);
-aa.number_=p++;
-aa.setCondition(Z);
-r.push(aa);
-var O=this.scripts();
-for(var C=0;C<O.length;C++){
-if(aa.matchesScript(O[C])){
-aa.set(O[C]);
-}
-}
-return aa.number();
-};
-l.setScriptBreakPointById=function(script_id,
-T,U,
-Z,opt_groupId){
-return this.setScriptBreakPoint(l.ScriptBreakPointType.ScriptId,
-script_id,T,U,
-Z,opt_groupId);
-};
-l.setScriptBreakPointByName=function(script_name,
-T,U,
-Z,opt_groupId){
-return this.setScriptBreakPoint(l.ScriptBreakPointType.ScriptName,
-script_name,T,U,
-Z,opt_groupId);
-};
-l.setScriptBreakPointByRegExp=function(script_regexp,
-T,U,
-Z,opt_groupId){
-return this.setScriptBreakPoint(l.ScriptBreakPointType.ScriptRegExp,
-script_regexp,T,U,
-Z,opt_groupId);
-};
-l.enableScriptBreakPoint=function(X){
-var aa=this.findScriptBreakPoint(X,false);
-aa.enable();
-};
-l.disableScriptBreakPoint=function(X){
-var aa=this.findScriptBreakPoint(X,false);
-aa.disable();
-};
-l.changeScriptBreakPointCondition=function(
-X,x){
-var aa=this.findScriptBreakPoint(X,false);
-aa.setCondition(x);
-};
-l.scriptBreakPoints=function(){
-return r;
-};
-l.clearStepping=function(){
+k.clearStepping=function(){
 %ClearStepping();
 };
-l.setBreakOnException=function(){
-return %ChangeBreakOnException(l.ExceptionBreak.Caught,true);
+k.setBreakOnException=function(){
+return %ChangeBreakOnException(k.ExceptionBreak.Caught,true);
 };
-l.clearBreakOnException=function(){
-return %ChangeBreakOnException(l.ExceptionBreak.Caught,false);
+k.clearBreakOnException=function(){
+return %ChangeBreakOnException(k.ExceptionBreak.Caught,false);
 };
-l.isBreakOnException=function(){
-return!!%IsBreakOnException(l.ExceptionBreak.Caught);
+k.isBreakOnException=function(){
+return!!%IsBreakOnException(k.ExceptionBreak.Caught);
 };
-l.setBreakOnUncaughtException=function(){
-return %ChangeBreakOnException(l.ExceptionBreak.Uncaught,true);
+k.setBreakOnUncaughtException=function(){
+return %ChangeBreakOnException(k.ExceptionBreak.Uncaught,true);
 };
-l.clearBreakOnUncaughtException=function(){
-return %ChangeBreakOnException(l.ExceptionBreak.Uncaught,false);
+k.clearBreakOnUncaughtException=function(){
+return %ChangeBreakOnException(k.ExceptionBreak.Uncaught,false);
 };
-l.isBreakOnUncaughtException=function(){
-return!!%IsBreakOnException(l.ExceptionBreak.Uncaught);
+k.isBreakOnUncaughtException=function(){
+return!!%IsBreakOnException(k.ExceptionBreak.Uncaught);
 };
-l.showBreakPoints=function(R,ab){
-if(!(%IsFunction(R)))throw %make_error(46);
-var ac=ab?this.scriptSource(R):this.source(R);
-var ad=ab?0:this.sourcePosition(R);
-var B=%GetBreakLocations(R);
-if(!B)return ac;
-B.sort(function(ae,af){return ae-af;});
-var ag="";
-var ah=0;
-var ai;
-for(var C=0;C<B.length;C++){
-ai=B[C]-ad;
-ag+=ac.slice(ah,ai);
-ag+="[B"+C+"]";
-ah=ai;
-}
-ai=ac.length;
-ag+=ac.substring(ah,ai);
-return ag;
-};
-l.scripts=function(){
+k.scripts=function(){
 return %DebugGetLoadedScripts();
 };
-function scriptById(aj){
-var O=l.scripts();
-for(var F of O){
-if(F.id==aj)return F;
+function scriptById(A){
+var p=k.scripts();
+for(var t of p){
+if(t.id==A)return t;
 }
 return(void 0);
 };
-l.debuggerFlags=function(){
-return s;
+k.debuggerFlags=function(){
+return m;
 };
-l.MakeMirror=g;
-function MakeExecutionState(A){
-return new ExecutionState(A);
+k.MakeMirror=g;
+function MakeExecutionState(B){
+return new ExecutionState(B);
 }
-function ExecutionState(A){
-this.break_id=A;
+function ExecutionState(B){
+this.break_id=B;
 this.selected_frame=0;
 }
-ExecutionState.prototype.prepareStep=function(ak){
-if(ak===l.StepAction.StepIn||
-ak===l.StepAction.StepOut||
-ak===l.StepAction.StepNext){
-return %PrepareStep(this.break_id,ak);
+ExecutionState.prototype.prepareStep=function(C){
+if(C===k.StepAction.StepIn||
+C===k.StepAction.StepOut||
+C===k.StepAction.StepNext){
+return %PrepareStep(this.break_id,C);
 }
-throw %make_type_error(46);
+throw %make_type_error(47);
 };
-ExecutionState.prototype.evaluateGlobal=function(ac){
-return g(%DebugEvaluateGlobal(this.break_id,ac));
+ExecutionState.prototype.evaluateGlobal=function(D){
+return g(%DebugEvaluateGlobal(this.break_id,D));
 };
 ExecutionState.prototype.frameCount=function(){
 return %GetFrameCount(this.break_id);
 };
-ExecutionState.prototype.frame=function(al){
-if(al==null)al=this.selected_frame;
-if(al<0||al>=this.frameCount()){
-throw %make_type_error(45);
+ExecutionState.prototype.frame=function(E){
+if(E==null)E=this.selected_frame;
+if(E<0||E>=this.frameCount()){
+throw %make_type_error(46);
 }
-return new c(this.break_id,al);
+return new c(this.break_id,E);
 };
-ExecutionState.prototype.setSelectedFrame=function(am){
-var C=(%_ToNumber(am));
-if(C<0||C>=this.frameCount()){
-throw %make_type_error(45);
+ExecutionState.prototype.setSelectedFrame=function(F){
+var s=(%_ToNumber(F));
+if(s<0||s>=this.frameCount()){
+throw %make_type_error(46);
 }
-this.selected_frame=C;
+this.selected_frame=s;
 };
 ExecutionState.prototype.selectedFrame=function(){
 return this.selected_frame;
 };
-function MakeBreakEvent(A,an){
-return new BreakEvent(A,an);
+function MakeExceptionEvent(B,G,H,I){
+return new ExceptionEvent(B,G,H,I);
 }
-function BreakEvent(A,an){
-this.frame_=new c(A,0);
-this.break_points_hit_=an;
-}
-BreakEvent.prototype.eventType=function(){
-return l.DebugEvent.Break;
-};
-BreakEvent.prototype.func=function(){
-return this.frame_.func();
-};
-BreakEvent.prototype.sourceLine=function(){
-return this.frame_.sourceLine();
-};
-BreakEvent.prototype.sourceColumn=function(){
-return this.frame_.sourceColumn();
-};
-BreakEvent.prototype.sourceLineText=function(){
-return this.frame_.sourceLineText();
-};
-BreakEvent.prototype.breakPointsHit=function(){
-return this.break_points_hit_;
-};
-function MakeExceptionEvent(A,ao,ap,aq){
-return new ExceptionEvent(A,ao,ap,aq);
-}
-function ExceptionEvent(A,ao,ap,aq){
-this.exec_state_=new ExecutionState(A);
-this.exception_=ao;
-this.uncaught_=ap;
-this.promise_=aq;
+function ExceptionEvent(B,G,H,I){
+this.exec_state_=new ExecutionState(B);
+this.exception_=G;
+this.uncaught_=H;
+this.promise_=I;
 }
 ExceptionEvent.prototype.eventType=function(){
-return l.DebugEvent.Exception;
+return k.DebugEvent.Exception;
 };
 ExceptionEvent.prototype.exception=function(){
 return this.exception_;
@@ -2002,12 +1562,12 @@ return this.exec_state_.frame(0).sourceColumn();
 ExceptionEvent.prototype.sourceLineText=function(){
 return this.exec_state_.frame(0).sourceLineText();
 };
-function MakeCompileEvent(F,n){
-return new CompileEvent(F,n);
+function MakeCompileEvent(t,l){
+return new CompileEvent(t,l);
 }
-function CompileEvent(F,n){
-this.script_=g(F);
-this.type_=n;
+function CompileEvent(t,l){
+this.script_=g(t);
+this.type_=l;
 }
 CompileEvent.prototype.eventType=function(){
 return this.type_;
@@ -2015,27 +1575,27 @@ return this.type_;
 CompileEvent.prototype.script=function(){
 return this.script_;
 };
-function MakeScriptObject_(F,ar){
-var as={id:F.id(),
-name:F.name(),
-lineOffset:F.lineOffset(),
-columnOffset:F.columnOffset(),
-lineCount:F.lineCount(),
+function MakeScriptObject_(t,J){
+var K={id:t.id(),
+name:t.name(),
+lineOffset:t.lineOffset(),
+columnOffset:t.columnOffset(),
+lineCount:t.lineCount(),
 };
-if(!(F.data()===(void 0))){
-as.data=F.data();
+if(!(t.data()===(void 0))){
+K.data=t.data();
 }
-if(ar){
-as.source=F.source();
+if(J){
+K.source=t.source();
 }
-return as;
+return K;
 }
-function MakeAsyncTaskEvent(n,at){
-return new AsyncTaskEvent(n,at);
+function MakeAsyncTaskEvent(l,L){
+return new AsyncTaskEvent(l,L);
 }
-function AsyncTaskEvent(n,at){
-this.type_=n;
-this.id_=at;
+function AsyncTaskEvent(l,L){
+this.type_=l;
+this.id_=L;
 }
 AsyncTaskEvent.prototype.type=function(){
 return this.type_;
@@ -2044,22 +1604,18 @@ AsyncTaskEvent.prototype.id=function(){
 return this.id_;
 }
 b.InstallConstants(a,[
-"Debug",l,
-"BreakEvent",BreakEvent,
+"Debug",k,
 "CompileEvent",CompileEvent,
-"BreakPoint",BreakPoint,
 ]);
 b.InstallConstants(b,[
 "MakeExecutionState",MakeExecutionState,
 "MakeExceptionEvent",MakeExceptionEvent,
-"MakeBreakEvent",MakeBreakEvent,
 "MakeCompileEvent",MakeCompileEvent,
 "MakeAsyncTaskEvent",MakeAsyncTaskEvent,
-"IsBreakPointTriggered",IsBreakPointTriggered,
 ]);
 })
 
- liveeditÅÌ
+ liveedit}Ì
 (function(a,b){
 "use strict";
 var c=a.Debug.findScriptSourcePosition;
@@ -2724,7 +2280,7 @@ return"LiveEdit Failure: "+this.message;
 function CopyErrorPositionToDetails(bw,o){
 function createPositionStruct(M,bx){
 if(bx==-1)return;
-var by=M.locationFromPosition(bx,true);
+var by=%ScriptPositionInfo(M,bx,true);
 if(by==null)return;
 return{
 line:by.line+1,
@@ -2828,7 +2384,7 @@ b.InstallConstants(b,[
 a.Debug.LiveEdit=bI;
 })
 
- prologue±)
+ prologue 
 (function(a,b,c){
 "use strict";
 %CheckIsBootstrapping();
@@ -2889,28 +2445,6 @@ b.Import=(void 0);
 b.ImportNow=(void 0);
 b.PostNatives=(void 0);
 }
-var p=ImportNow("iterator_symbol");
-function GetMethod(q,r){
-var s=q[r];
-if((s==null))return(void 0);
-if((typeof(s)==='function'))return s;
-throw %make_type_error(24,typeof s);
-}
-function GetIterator(q,t){
-if((t===(void 0))){
-t=q[p];
-}
-if(!(typeof(t)==='function')){
-throw %make_type_error(87,q);
-}
-var u=%_Call(t,q);
-if(!(%_IsJSReceiver(u))){
-throw %make_type_error(80,u);
-}
-return u;
-}
-e.GetIterator=GetIterator;
-e.GetMethod=GetMethod;
 %OptimizeObjectForAddingMultipleProperties(b,14);
 b.Import=Import;
 b.ImportNow=ImportNow;
@@ -2933,24 +2467,16 @@ message+=arg;
 c.createPrivateSymbol=function createPrivateSymbol(g){
 return %CreatePrivateSymbol(g);
 };
-c.simpleBind=function simpleBind(s,v){
-return function(...args){
-return %reflect_apply(s,v,args);
+c.uncurryThis=function uncurryThis(p){
+return function(thisArg,...args){
+return %reflect_apply(p,thisArg,args);
 };
 };
-c.uncurryThis=function uncurryThis(s){
-return function(v,...args){
-return %reflect_apply(s,v,args);
+c.markPromiseAsHandled=function markPromiseAsHandled(q){
+%PromiseMarkAsHandled(q);
 };
-};
-c.rejectPromise=function rejectPromise(w,x){
-%promise_internal_reject(w,x,true);
-}
-c.markPromiseAsHandled=function markPromiseAsHandled(w){
-%PromiseMarkAsHandled(w);
-};
-c.promiseState=function promiseState(w){
-return %PromiseStatus(w);
+c.promiseState=function promiseState(q){
+return %PromiseStatus(q);
 };
 c.kPROMISE_PENDING=0;
 c.kPROMISE_FULFILLED=1;
@@ -2958,921 +2484,834 @@ c.kPROMISE_REJECTED=2;
 %ToFastProperties(c);
 })
 
-arrayΩˆ
+array≠ﬂ
 (function(a,b,c){
 "use strict";
 %CheckIsBootstrapping();
-var d;
-var e;
-var f=a.Array;
-var g=b.InternalArray;
-var h=a.Math.max;
-var i=a.Math.min;
-var j=a.Object.prototype.hasOwnProperty;
-var k=a.Object.prototype.toString;
-var l=b.ImportNow("iterator_symbol");
-var m=b.ImportNow("unscopables_symbol");
-b.Import(function(n){
-d=n.GetIterator;
-e=n.GetMethod;
-});
-function ArraySpeciesCreate(o,p){
-p=((p)+0)
+var d=a.Array;
+var e=b.InternalArray;
+var f=a.Math.max;
+var g=a.Math.min;
+var h=a.Object.prototype.hasOwnProperty;
+var i=a.Object.prototype.toString;
+var j=b.ImportNow("iterator_symbol");
+var k=b.ImportNow("unscopables_symbol");
+function ArraySpeciesCreate(l,m){
+m=((m)+0)
 ;
-var q=%ArraySpeciesConstructor(o);
-return new q(p);
+var n=%ArraySpeciesConstructor(l);
+return new n(m);
 }
-function KeySortCompare(r,s){
-return r-s;
+function KeySortCompare(o,p){
+return o-p;
 }
-function GetSortedArrayKeys(o,t){
-if((typeof(t)==='number')){
-var u=t;
-var v=new g();
-for(var w=0;w<u;++w){
-var x=o[w];
-if(!(x===(void 0))||w in o){
-v.push(w);
+function GetSortedArrayKeys(l,q){
+if((typeof(q)==='number')){
+var r=q;
+var s=new e();
+for(var t=0;t<r;++t){
+var u=l[t];
+if(!(u===(void 0))||t in l){
+s.push(t);
 }
 }
-return v;
+return s;
 }
-return InnerArraySort(t,t.length,KeySortCompare);
+return InnerArraySort(q,q.length,KeySortCompare);
 }
-function SparseJoinWithSeparatorJS(o,v,p,y,z){
-var A=v.length;
-var B=new g(A*2);
-for(var w=0;w<A;w++){
-var C=v[w];
-B[w*2]=C;
-B[w*2+1]=ConvertToString(y,o[C]);
+function SparseJoinWithSeparatorJS(l,s,m,v,w){
+var x=s.length;
+var y=new e(x*2);
+for(var t=0;t<x;t++){
+var z=s[t];
+y[t*2]=z;
+y[t*2+1]=ConvertToString(v,l[z]);
 }
-return %SparseJoinWithSeparator(B,p,z);
+return %SparseJoinWithSeparator(y,m,w);
 }
-function SparseJoin(o,v,y){
-var A=v.length;
-var B=new g(A);
-for(var w=0;w<A;w++){
-B[w]=ConvertToString(y,o[v[w]]);
+function SparseJoin(l,s,v){
+var x=s.length;
+var y=new e(x);
+for(var t=0;t<x;t++){
+y[t]=ConvertToString(v,l[s[t]]);
 }
-return %StringBuilderConcat(B,A,'');
+return %StringBuilderConcat(y,x,'');
 }
-function UseSparseVariant(o,p,D,E){
-if(!D||p<1000||%HasComplexElements(o)){
+function UseSparseVariant(l,m,A,B){
+if(!A||m<1000||%HasComplexElements(l)){
 return false;
 }
-if(!%_IsSmi(p)){
+if(!%_IsSmi(m)){
 return true;
 }
-var F=p>>2;
-var G=%EstimateNumberOfElements(o);
-return(G<F)&&
-(E>G*4);
+var C=m>>2;
+var D=%EstimateNumberOfElements(l);
+return(D<C)&&
+(B>D*4);
 }
 function Stack(){
 this.length=0;
-this.values=new g();
+this.values=new e();
 }
 Stack.prototype.length=null;
 Stack.prototype.values=null;
-function StackPush(H,I){
-H.values[H.length++]=I;
+function StackPush(E,F){
+E.values[E.length++]=F;
 }
-function StackPop(H){
-H.values[--H.length]=null
+function StackPop(E){
+E.values[--E.length]=null
 }
-function StackHas(H,J){
-var p=H.length;
-var K=H.values;
-for(var w=0;w<p;w++){
-if(K[w]===J)return true;
+function StackHas(E,G){
+var m=E.length;
+var H=E.values;
+for(var t=0;t<m;t++){
+if(H[t]===G)return true;
 }
 return false;
 }
-var L=new Stack();
-function DoJoin(o,p,D,z,y){
-if(UseSparseVariant(o,p,D,p)){
-%NormalizeElements(o);
-var v=GetSortedArrayKeys(o,%GetArrayKeys(o,p));
-if(z===''){
-if(v.length===0)return'';
-return SparseJoin(o,v,y);
+var I=new Stack();
+function DoJoin(l,m,A,w,v){
+if(UseSparseVariant(l,m,A,m)){
+%NormalizeElements(l);
+var s=GetSortedArrayKeys(l,%GetArrayKeys(l,m));
+if(w===''){
+if(s.length===0)return'';
+return SparseJoin(l,s,v);
 }else{
 return SparseJoinWithSeparatorJS(
-o,v,p,y,z);
+l,s,m,v,w);
 }
 }
-if(p===1){
-return ConvertToString(y,o[0]);
+if(m===1){
+return ConvertToString(v,l[0]);
 }
-var B=new g(p);
-for(var w=0;w<p;w++){
-B[w]=ConvertToString(y,o[w]);
+var y=new e(m);
+for(var t=0;t<m;t++){
+y[t]=ConvertToString(v,l[t]);
 }
-if(z===''){
-return %StringBuilderConcat(B,p,'');
+if(w===''){
+return %StringBuilderConcat(y,m,'');
 }else{
-return %StringBuilderJoin(B,p,z);
+return %StringBuilderJoin(y,m,w);
 }
 }
-function Join(o,p,z,y){
-if(p===0)return'';
-var D=(%_IsArray(o));
-if(D){
-if(StackHas(L,o))return'';
-StackPush(L,o);
+function Join(l,m,w,v){
+if(m===0)return'';
+var A=(%_IsArray(l));
+if(A){
+if(StackHas(I,l))return'';
+StackPush(I,l);
 }
 try{
-return DoJoin(o,p,D,z,y);
+return DoJoin(l,m,A,w,v);
 }finally{
-if(D)StackPop(L);
+if(A)StackPop(I);
 }
 }
-function ConvertToString(y,M){
-if((M==null))return'';
-return(%_ToString(y?M.toLocaleString():M));
+function ConvertToString(v,J){
+if((J==null))return'';
+return(%_ToString(v?J.toLocaleString():J));
 }
-function SparseSlice(o,N,O,P,Q){
-var t=%GetArrayKeys(o,N+O);
-if((typeof(t)==='number')){
-var u=t;
-for(var w=N;w<u;++w){
-var R=o[w];
-if(!(R===(void 0))||w in o){
-%CreateDataProperty(Q,w-N,R);
-}
-}
-}else{
-var p=t.length;
-for(var S=0;S<p;++S){
-var C=t[S];
-if(C>=N){
-var R=o[C];
-if(!(R===(void 0))||C in o){
-%CreateDataProperty(Q,C-N,R);
-}
-}
-}
-}
-}
-function SparseMove(o,N,O,P,T){
-if(T===O)return;
-var U=new g(
-i(P-O+T,0xffffffff));
-var V;
-var t=%GetArrayKeys(o,P);
-if((typeof(t)==='number')){
-var u=t;
-for(var w=0;w<N&&w<u;++w){
-var R=o[w];
-if(!(R===(void 0))||w in o){
-U[w]=R;
-}
-}
-for(var w=N+O;w<u;++w){
-var R=o[w];
-if(!(R===(void 0))||w in o){
-U[w-O+T]=R;
+function SparseSlice(l,K,L,M,N){
+var q=%GetArrayKeys(l,K+L);
+if((typeof(q)==='number')){
+var r=q;
+for(var t=K;t<r;++t){
+var O=l[t];
+if(!(O===(void 0))||t in l){
+%CreateDataProperty(N,t-K,O);
 }
 }
 }else{
-var p=t.length;
-for(var S=0;S<p;++S){
-var C=t[S];
-if(C<N){
-var R=o[C];
-if(!(R===(void 0))||C in o){
-U[C]=R;
-}
-}else if(C>=N+O){
-var R=o[C];
-if(!(R===(void 0))||C in o){
-var W=C-O+T;
-U[W]=R;
-if(W>0xfffffffe){
-V=V||new g();
-V.push(W);
+var m=q.length;
+for(var P=0;P<m;++P){
+var z=q[P];
+if(z>=K){
+var O=l[z];
+if(!(O===(void 0))||z in l){
+%CreateDataProperty(N,z-K,O);
 }
 }
 }
 }
 }
-%MoveArrayContents(U,o);
-if(!(V===(void 0))){
-var p=V.length;
-for(var w=0;w<p;++w){
-var C=V[w];
-o[C]=U[C];
+function SparseMove(l,K,L,M,Q){
+if(Q===L)return;
+var R=new e(
+g(M-L+Q,0xffffffff));
+var S;
+var q=%GetArrayKeys(l,M);
+if((typeof(q)==='number')){
+var r=q;
+for(var t=0;t<K&&t<r;++t){
+var O=l[t];
+if(!(O===(void 0))||t in l){
+R[t]=O;
 }
 }
-}
-function SimpleSlice(o,N,O,P,Q){
-for(var w=0;w<O;w++){
-var X=N+w;
-if(X in o){
-var R=o[X];
-%CreateDataProperty(Q,w,R);
-}
-}
-}
-function SimpleMove(o,N,O,P,T){
-if(T!==O){
-if(T>O){
-for(var w=P-O;w>N;w--){
-var Y=w+O-1;
-var Z=w+T-1;
-if(Y in o){
-o[Z]=o[Y];
-}else{
-delete o[Z];
+for(var t=K+L;t<r;++t){
+var O=l[t];
+if(!(O===(void 0))||t in l){
+R[t-L+Q]=O;
 }
 }
 }else{
-for(var w=N;w<P-O;w++){
-var Y=w+O;
-var Z=w+T;
-if(Y in o){
-o[Z]=o[Y];
+var m=q.length;
+for(var P=0;P<m;++P){
+var z=q[P];
+if(z<K){
+var O=l[z];
+if(!(O===(void 0))||z in l){
+R[z]=O;
+}
+}else if(z>=K+L){
+var O=l[z];
+if(!(O===(void 0))||z in l){
+var T=z-L+Q;
+R[T]=O;
+if(T>0xfffffffe){
+S=S||new e();
+S.push(T);
+}
+}
+}
+}
+}
+%MoveArrayContents(R,l);
+if(!(S===(void 0))){
+var m=S.length;
+for(var t=0;t<m;++t){
+var z=S[t];
+l[z]=R[z];
+}
+}
+}
+function SimpleSlice(l,K,L,M,N){
+for(var t=0;t<L;t++){
+var U=K+t;
+if(U in l){
+var O=l[U];
+%CreateDataProperty(N,t,O);
+}
+}
+}
+function SimpleMove(l,K,L,M,Q){
+if(Q!==L){
+if(Q>L){
+for(var t=M-L;t>K;t--){
+var V=t+L-1;
+var W=t+Q-1;
+if(V in l){
+l[W]=l[V];
 }else{
-delete o[Z];
+delete l[W];
 }
 }
-for(var w=P;w>P-O+T;w--){
-delete o[w-1];
+}else{
+for(var t=K;t<M-L;t++){
+var V=t+L;
+var W=t+Q;
+if(V in l){
+l[W]=l[V];
+}else{
+delete l[W];
+}
+}
+for(var t=M;t>M-L+Q;t--){
+delete l[t-1];
 }
 }
 }
 }
-var aa;
-%DefineMethodsInternal(f.prototype,class{toString(){
-var o;
-var ab;
+var X;
+%DefineMethodsInternal(d.prototype,class{toString(){
+var l;
+var Y;
 if((%_IsArray(this))){
-ab=this.join;
-if(ab===aa){
+Y=this.join;
+if(Y===X){
 return Join(this,this.length,',',false);
 }
-o=this;
+l=this;
 }else{
-o=(%_ToObject(this));
-ab=o.join;
+l=(%_ToObject(this));
+Y=l.join;
 }
-if(!(typeof(ab)==='function')){
-return %_Call(k,o);
+if(!(typeof(Y)==='function')){
+return %_Call(i,l);
 }
-return %_Call(ab,o);
+return %_Call(Y,l);
 }},-1);
-function InnerArrayToLocaleString(o,p){
-return Join(o,(%_ToLength(p)),',',true);
+function InnerArrayToLocaleString(l,m){
+return Join(l,(%_ToLength(m)),',',true);
 }
-%DefineMethodsInternal(f.prototype,class{toLocaleString(){
-var o=(%_ToObject(this));
-var ac=o.length;
-return InnerArrayToLocaleString(o,ac);
+%DefineMethodsInternal(d.prototype,class{toLocaleString(){
+var l=(%_ToObject(this));
+var Z=l.length;
+return InnerArrayToLocaleString(l,Z);
 }},-1);
-function InnerArrayJoin(z,o,p){
-if((z===(void 0))){
-z=',';
+function InnerArrayJoin(w,l,m){
+if((w===(void 0))){
+w=',';
 }else{
-z=(%_ToString(z));
+w=(%_ToString(w));
 }
-if(p===1){
-var x=o[0];
-if((x==null))return'';
-return(%_ToString(x));
+if(m===1){
+var u=l[0];
+if((u==null))return'';
+return(%_ToString(u));
 }
-return Join(o,p,z,false);
+return Join(l,m,w,false);
 }
-%DefineMethodsInternal(f.prototype,class{join(z){
-var o=(%_ToObject(this));
-var p=(%_ToLength(o.length));
-return InnerArrayJoin(z,o,p);
+%DefineMethodsInternal(d.prototype,class{join(w){
+var l=(%_ToObject(this));
+var m=(%_ToLength(l.length));
+return InnerArrayJoin(w,l,m);
 }},-1);
 function ArrayPopFallback(){
-var o=(%_ToObject(this));
-var ad=(%_ToLength(o.length));
-if(ad==0){
-o.length=ad;
+var l=(%_ToObject(this));
+var aa=(%_ToLength(l.length));
+if(aa==0){
+l.length=aa;
 return;
 }
-ad--;
-var I=o[ad];
-delete o[ad];
-o.length=ad;
-return I;
+aa--;
+var F=l[aa];
+delete l[aa];
+l.length=aa;
+return F;
 }
 function ArrayPushFallback(){
-var o=(%_ToObject(this));
-var ad=(%_ToLength(o.length));
-var ae=arguments.length;
-if(ae>9007199254740991-ad)throw %make_type_error(252,ae,ad);
-for(var w=0;w<ae;w++){
-o[w+ad]=arguments[w];
+var l=(%_ToObject(this));
+var aa=(%_ToLength(l.length));
+var ab=arguments.length;
+if(ab>9007199254740991-aa)throw %make_type_error(261,ab,aa);
+for(var t=0;t<ab;t++){
+l[t+aa]=arguments[t];
 }
-var af=ad+ae;
-o.length=af;
-return af;
+var ac=aa+ab;
+l.length=ac;
+return ac;
 }
-function SparseReverse(o,P){
-var v=GetSortedArrayKeys(o,%GetArrayKeys(o,P));
-var ag=v.length-1;
-var ah=0;
-while(ah<=ag){
-var w=v[ah];
-var ai=v[ag];
-var aj=P-ai-1;
-var ak,al;
-if(aj<=w){
-al=ai;
-while(v[--ag]==ai){}
-ak=aj;
+function SparseReverse(l,M){
+var s=GetSortedArrayKeys(l,%GetArrayKeys(l,M));
+var ad=s.length-1;
+var ae=0;
+while(ae<=ad){
+var t=s[ae];
+var af=s[ad];
+var ag=M-af-1;
+var ah,ai;
+if(ag<=t){
+ai=af;
+while(s[--ad]==af){}
+ah=ag;
 }
-if(aj>=w){
-ak=w;
-while(v[++ah]==w){}
-al=P-w-1;
+if(ag>=t){
+ah=t;
+while(s[++ae]==t){}
+ai=M-t-1;
 }
-var am=o[ak];
-if(!(am===(void 0))||ak in o){
-var an=o[al];
-if(!(an===(void 0))||al in o){
-o[ak]=an;
-o[al]=am;
+var aj=l[ah];
+if(!(aj===(void 0))||ah in l){
+var ak=l[ai];
+if(!(ak===(void 0))||ai in l){
+l[ah]=ak;
+l[ai]=aj;
 }else{
-o[al]=am;
-delete o[ak];
-}
-}else{
-var an=o[al];
-if(!(an===(void 0))||al in o){
-o[ak]=an;
-delete o[al];
-}
-}
-}
-}
-function PackedArrayReverse(o,P){
-var ai=P-1;
-for(var w=0;w<ai;w++,ai--){
-var am=o[w];
-var an=o[ai];
-o[w]=an;
-o[ai]=am;
-}
-return o;
-}
-function GenericArrayReverse(o,P){
-var ai=P-1;
-for(var w=0;w<ai;w++,ai--){
-if(w in o){
-var am=o[w];
-if(ai in o){
-var an=o[ai];
-o[w]=an;
-o[ai]=am;
-}else{
-o[ai]=am;
-delete o[w];
+l[ai]=aj;
+delete l[ah];
 }
 }else{
-if(ai in o){
-var an=o[ai];
-o[w]=an;
-delete o[ai];
+var ak=l[ai];
+if(!(ak===(void 0))||ai in l){
+l[ah]=ak;
+delete l[ai];
 }
 }
 }
-return o;
 }
-%DefineMethodsInternal(f.prototype,class{reverse(){
-var o=(%_ToObject(this));
-var P=(%_ToLength(o.length));
-var ao=(%_IsArray(o));
-if(UseSparseVariant(o,P,ao,P)){
-%NormalizeElements(o);
-SparseReverse(o,P);
-return o;
-}else if(ao&&%_HasFastPackedElements(o)){
-return PackedArrayReverse(o,P);
+function PackedArrayReverse(l,M){
+var af=M-1;
+for(var t=0;t<af;t++,af--){
+var aj=l[t];
+var ak=l[af];
+l[t]=ak;
+l[af]=aj;
+}
+return l;
+}
+function GenericArrayReverse(l,M){
+var af=M-1;
+for(var t=0;t<af;t++,af--){
+if(t in l){
+var aj=l[t];
+if(af in l){
+var ak=l[af];
+l[t]=ak;
+l[af]=aj;
 }else{
-return GenericArrayReverse(o,P);
+l[af]=aj;
+delete l[t];
+}
+}else{
+if(af in l){
+var ak=l[af];
+l[t]=ak;
+delete l[af];
+}
+}
+}
+return l;
+}
+%DefineMethodsInternal(d.prototype,class{reverse(){
+var l=(%_ToObject(this));
+var M=(%_ToLength(l.length));
+var al=(%_IsArray(l));
+if(UseSparseVariant(l,M,al,M)){
+%NormalizeElements(l);
+SparseReverse(l,M);
+return l;
+}else if(al&&%_HasFastPackedElements(l)){
+return PackedArrayReverse(l,M);
+}else{
+return GenericArrayReverse(l,M);
 }
 }},-1);
 function ArrayShiftFallback(){
-var o=(%_ToObject(this));
-var P=(%_ToLength(o.length));
-if(P===0){
-o.length=0;
+var l=(%_ToObject(this));
+var M=(%_ToLength(l.length));
+if(M===0){
+l.length=0;
 return;
 }
-if(%object_is_sealed(o))throw %make_type_error(14);
-var ap=o[0];
-if(UseSparseVariant(o,P,(%_IsArray(o)),P)){
-SparseMove(o,0,1,P,0);
+if(%object_is_sealed(l))throw %make_type_error(15);
+var am=l[0];
+if(UseSparseVariant(l,M,(%_IsArray(l)),M)){
+SparseMove(l,0,1,M,0);
 }else{
-SimpleMove(o,0,1,P,0);
+SimpleMove(l,0,1,M,0);
 }
-o.length=P-1;
-return ap;
+l.length=M-1;
+return am;
 }
-function ArrayUnshiftFallback(aq){
-var o=(%_ToObject(this));
-var P=(%_ToLength(o.length));
-var ar=arguments.length;
-if(P>0&&UseSparseVariant(o,P,(%_IsArray(o)),P)&&
-!%object_is_sealed(o)){
-SparseMove(o,0,0,P,ar);
+function ArrayUnshiftFallback(an){
+var l=(%_ToObject(this));
+var M=(%_ToLength(l.length));
+var ao=arguments.length;
+if(M>0&&UseSparseVariant(l,M,(%_IsArray(l)),M)&&
+!%object_is_sealed(l)){
+SparseMove(l,0,0,M,ao);
 }else{
-SimpleMove(o,0,0,P,ar);
+SimpleMove(l,0,0,M,ao);
 }
-for(var w=0;w<ar;w++){
-o[w]=arguments[w];
+for(var t=0;t<ao;t++){
+l[t]=arguments[t];
 }
-var af=P+ar;
-o.length=af;
-return af;
+var ac=M+ao;
+l.length=ac;
+return ac;
 }
-function ArraySliceFallback(as,at){
-var o=(%_ToObject(this));
-var P=(%_ToLength(o.length));
-var N=(%_ToInteger(as));
-var au=P;
-if(!(at===(void 0)))au=(%_ToInteger(at));
-if(N<0){
-N+=P;
-if(N<0)N=0;
-}else{
-if(N>P)N=P;
+function ArraySliceFallback(ap,aq){
+return null;
 }
-if(au<0){
-au+=P;
-if(au<0)au=0;
-}else{
-if(au>P)au=P;
+function ComputeSpliceStartIndex(K,M){
+if(K<0){
+K+=M;
+return K<0?0:K;
 }
-var av=ArraySpeciesCreate(o,h(au-N,0));
-if(au<N)return av;
-if(UseSparseVariant(o,P,(%_IsArray(o)),au-N)){
-%NormalizeElements(o);
-if((%_IsArray(av)))%NormalizeElements(av);
-SparseSlice(o,N,au-N,P,av);
-}else{
-SimpleSlice(o,N,au-N,P,av);
+return K>M?M:K;
 }
-av.length=au-N;
-return av;
-}
-function ComputeSpliceStartIndex(N,P){
-if(N<0){
-N+=P;
-return N<0?0:N;
-}
-return N>P?P:N;
-}
-function ComputeSpliceDeleteCount(aw,ar,P,N){
-var O=0;
-if(ar==1)
-return P-N;
-O=(%_ToInteger(aw));
-if(O<0)
+function ComputeSpliceDeleteCount(ar,ao,M,K){
+var L=0;
+if(ao==1)
+return M-K;
+L=(%_ToInteger(ar));
+if(L<0)
 return 0;
-if(O>P-N)
-return P-N;
-return O;
+if(L>M-K)
+return M-K;
+return L;
 }
-function ArraySpliceFallback(as,aw){
-var ar=arguments.length;
-var o=(%_ToObject(this));
-var P=(%_ToLength(o.length));
-var N=ComputeSpliceStartIndex((%_ToInteger(as)),P);
-var O=ComputeSpliceDeleteCount(aw,ar,P,
-N);
-var Q=ArraySpeciesCreate(o,O);
-Q.length=O;
-var ax=ar>2?ar-2:0;
-if(O!=ax&&%object_is_sealed(o)){
+function ArraySpliceFallback(ap,ar){
+var ao=arguments.length;
+var l=(%_ToObject(this));
+var M=(%_ToLength(l.length));
+var K=ComputeSpliceStartIndex((%_ToInteger(ap)),M);
+var L=ComputeSpliceDeleteCount(ar,ao,M,
+K);
+var N=ArraySpeciesCreate(l,L);
+N.length=L;
+var as=ao>2?ao-2:0;
+if(L!=as&&%object_is_sealed(l)){
+throw %make_type_error(15);
+}else if(L>0&&%object_is_frozen(l)){
 throw %make_type_error(14);
-}else if(O>0&&%object_is_frozen(o)){
-throw %make_type_error(13);
 }
-var ay=O;
-if(ax!=O){
-ay+=P-N-O;
+var at=L;
+if(as!=L){
+at+=M-K-L;
 }
-if(UseSparseVariant(o,P,(%_IsArray(o)),ay)){
-%NormalizeElements(o);
-if((%_IsArray(Q)))%NormalizeElements(Q);
-SparseSlice(o,N,O,P,Q);
-SparseMove(o,N,O,P,ax);
+if(UseSparseVariant(l,M,(%_IsArray(l)),at)){
+%NormalizeElements(l);
+if((%_IsArray(N)))%NormalizeElements(N);
+SparseSlice(l,K,L,M,N);
+SparseMove(l,K,L,M,as);
 }else{
-SimpleSlice(o,N,O,P,Q);
-SimpleMove(o,N,O,P,ax);
+SimpleSlice(l,K,L,M,N);
+SimpleMove(l,K,L,M,as);
 }
-var w=N;
-var az=2;
-var aA=arguments.length;
-while(az<aA){
-o[w++]=arguments[az++];
+var t=K;
+var au=2;
+var av=arguments.length;
+while(au<av){
+l[t++]=arguments[au++];
 }
-o.length=P-O+ax;
-return Q;
+l.length=M-L+as;
+return N;
 }
-function InnerArraySort(o,p,aB){
-if(!(typeof(aB)==='function')){
-aB=function(M,aC){
-if(M===aC)return 0;
-if(%_IsSmi(M)&&%_IsSmi(aC)){
-return %SmiLexicographicCompare(M,aC);
+function InnerArraySort(l,m,aw){
+if(!(typeof(aw)==='function')){
+aw=function(J,ax){
+if(J===ax)return 0;
+if(%_IsSmi(J)&&%_IsSmi(ax)){
+return %SmiLexicographicCompare(J,ax);
 }
-M=(%_ToString(M));
-aC=(%_ToString(aC));
-if(M==aC)return 0;
-else return M<aC?-1:1;
+J=(%_ToString(J));
+ax=(%_ToString(ax));
+if(J==ax)return 0;
+else return J<ax?-1:1;
 };
 }
-function InsertionSort(r,n,aD){
-for(var w=n+1;w<aD;w++){
-var aE=r[w];
-for(var ai=w-1;ai>=n;ai--){
-var aF=r[ai];
-var aG=aB(aF,aE);
-if(aG>0){
-r[ai+1]=aF;
+function InsertionSort(o,ay,az){
+for(var t=ay+1;t<az;t++){
+var aA=o[t];
+for(var af=t-1;af>=ay;af--){
+var aB=o[af];
+var aC=aw(aB,aA);
+if(aC>0){
+o[af+1]=aB;
 }else{
 break;
 }
 }
-r[ai+1]=aE;
+o[af+1]=aA;
 }
 };
-function GetThirdIndex(r,n,aD){
-var aH=new g();
-var aI=200+((aD-n)&15);
-var ai=0;
-n+=1;
-aD-=1;
-for(var w=n;w<aD;w+=aI){
-aH[ai]=[w,r[w]];
-ai++;
+function GetThirdIndex(o,ay,az){
+var aD=new e();
+var aE=200+((az-ay)&15);
+var af=0;
+ay+=1;
+az-=1;
+for(var t=ay;t<az;t+=aE){
+aD[af]=[t,o[t]];
+af++;
 }
-aH.sort(function(r,s){
-return aB(r[1],s[1]);
+aD.sort(function(o,p){
+return aw(o[1],p[1]);
 });
-var aJ=aH[aH.length>>1][0];
-return aJ;
+var aF=aD[aD.length>>1][0];
+return aF;
 }
-function QuickSort(r,n,aD){
-var aJ=0;
+function QuickSort(o,ay,az){
+var aF=0;
 while(true){
-if(aD-n<=10){
-InsertionSort(r,n,aD);
+if(az-ay<=10){
+InsertionSort(o,ay,az);
 return;
 }
-if(aD-n>1000){
-aJ=GetThirdIndex(r,n,aD);
+if(az-ay>1000){
+aF=GetThirdIndex(o,ay,az);
 }else{
-aJ=n+((aD-n)>>1);
+aF=ay+((az-ay)>>1);
 }
-var aK=r[n];
-var aL=r[aD-1];
-var aM=r[aJ];
-var aN=aB(aK,aL);
-if(aN>0){
-var aF=aK;
-aK=aL;
-aL=aF;
+var aG=o[ay];
+var aH=o[az-1];
+var aI=o[aF];
+var aJ=aw(aG,aH);
+if(aJ>0){
+var aB=aG;
+aG=aH;
+aH=aB;
 }
-var aO=aB(aK,aM);
-if(aO>=0){
-var aF=aK;
-aK=aM;
-aM=aL;
-aL=aF;
+var aK=aw(aG,aI);
+if(aK>=0){
+var aB=aG;
+aG=aI;
+aI=aH;
+aH=aB;
 }else{
-var aP=aB(aL,aM);
-if(aP>0){
-var aF=aL;
-aL=aM;
-aM=aF;
+var aL=aw(aH,aI);
+if(aL>0){
+var aB=aH;
+aH=aI;
+aI=aB;
 }
 }
-r[n]=aK;
-r[aD-1]=aM;
-var aQ=aL;
-var aR=n+1;
-var aS=aD-1;
-r[aJ]=r[aR];
-r[aR]=aQ;
-partition:for(var w=aR+1;w<aS;w++){
-var aE=r[w];
-var aG=aB(aE,aQ);
-if(aG<0){
-r[w]=r[aR];
-r[aR]=aE;
-aR++;
-}else if(aG>0){
+o[ay]=aG;
+o[az-1]=aI;
+var aM=aH;
+var aN=ay+1;
+var aO=az-1;
+o[aF]=o[aN];
+o[aN]=aM;
+partition:for(var t=aN+1;t<aO;t++){
+var aA=o[t];
+var aC=aw(aA,aM);
+if(aC<0){
+o[t]=o[aN];
+o[aN]=aA;
+aN++;
+}else if(aC>0){
 do{
-aS--;
-if(aS==w)break partition;
-var aT=r[aS];
-aG=aB(aT,aQ);
-}while(aG>0);
-r[w]=r[aS];
-r[aS]=aE;
-if(aG<0){
-aE=r[w];
-r[w]=r[aR];
-r[aR]=aE;
-aR++;
+aO--;
+if(aO==t)break partition;
+var aP=o[aO];
+aC=aw(aP,aM);
+}while(aC>0);
+o[t]=o[aO];
+o[aO]=aA;
+if(aC<0){
+aA=o[t];
+o[t]=o[aN];
+o[aN]=aA;
+aN++;
 }
 }
 }
-if(aD-aS<aR-n){
-QuickSort(r,aS,aD);
-aD=aR;
+if(az-aO<aN-ay){
+QuickSort(o,aO,az);
+az=aN;
 }else{
-QuickSort(r,n,aR);
-n=aS;
+QuickSort(o,ay,aN);
+ay=aO;
 }
 }
 };
-function CopyFromPrototype(aU,p){
-var aV=0;
-for(var aW=%object_get_prototype_of(aU);aW;
-aW=%object_get_prototype_of(aW)){
-var t=(%_IsJSProxy(aW))
-?p:%GetArrayKeys(aW,p);
-if((typeof(t)==='number')){
-var aX=t;
-for(var w=0;w<aX;w++){
-if(!(%_Call(j,aU,w))&&(%_Call(j,aW,w))){
-aU[w]=aW[w];
-if(w>=aV){aV=w+1;}
+function CopyFromPrototype(aQ,m){
+var aR=0;
+for(var aS=%object_get_prototype_of(aQ);aS;
+aS=%object_get_prototype_of(aS)){
+var q=(%_IsJSProxy(aS))
+?m:%GetArrayKeys(aS,m);
+if((typeof(q)==='number')){
+var aT=q;
+for(var t=0;t<aT;t++){
+if(!(%_Call(h,aQ,t))&&(%_Call(h,aS,t))){
+aQ[t]=aS[t];
+if(t>=aR){aR=t+1;}
 }
 }
 }else{
-for(var w=0;w<t.length;w++){
-var X=t[w];
-if(!(%_Call(j,aU,X))&&(%_Call(j,aW,X))){
-aU[X]=aW[X];
-if(X>=aV){aV=X+1;}
+for(var t=0;t<q.length;t++){
+var U=q[t];
+if(!(%_Call(h,aQ,U))&&(%_Call(h,aS,U))){
+aQ[U]=aS[U];
+if(U>=aR){aR=U+1;}
 }
 }
 }
 }
-return aV;
+return aR;
 };
-function ShadowPrototypeElements(aU,n,aD){
-for(var aW=%object_get_prototype_of(aU);aW;
-aW=%object_get_prototype_of(aW)){
-var t=(%_IsJSProxy(aW))
-?aD:%GetArrayKeys(aW,aD);
-if((typeof(t)==='number')){
-var aX=t;
-for(var w=n;w<aX;w++){
-if((%_Call(j,aW,w))){
-aU[w]=(void 0);
+function ShadowPrototypeElements(aQ,ay,az){
+for(var aS=%object_get_prototype_of(aQ);aS;
+aS=%object_get_prototype_of(aS)){
+var q=(%_IsJSProxy(aS))
+?az:%GetArrayKeys(aS,az);
+if((typeof(q)==='number')){
+var aT=q;
+for(var t=ay;t<aT;t++){
+if((%_Call(h,aS,t))){
+aQ[t]=(void 0);
 }
 }
 }else{
-for(var w=0;w<t.length;w++){
-var X=t[w];
-if(n<=X&&(%_Call(j,aW,X))){
-aU[X]=(void 0);
+for(var t=0;t<q.length;t++){
+var U=q[t];
+if(ay<=U&&(%_Call(h,aS,U))){
+aQ[U]=(void 0);
 }
 }
 }
 }
 };
-function SafeRemoveArrayHoles(aU){
-var aY=0;
-var aZ=p-1;
-var ba=0;
-while(aY<aZ){
-while(aY<aZ&&
-!(aU[aY]===(void 0))){
-aY++;
+function SafeRemoveArrayHoles(aQ){
+var aU=0;
+var aV=m-1;
+var aW=0;
+while(aU<aV){
+while(aU<aV&&
+!(aQ[aU]===(void 0))){
+aU++;
 }
-if(!(%_Call(j,aU,aY))){
-ba++;
+if(!(%_Call(h,aQ,aU))){
+aW++;
 }
-while(aY<aZ&&
-(aU[aZ]===(void 0))){
-if(!(%_Call(j,aU,aZ))){
-ba++;
+while(aU<aV&&
+(aQ[aV]===(void 0))){
+if(!(%_Call(h,aQ,aV))){
+aW++;
 }
-aZ--;
+aV--;
 }
-if(aY<aZ){
-aU[aY]=aU[aZ];
-aU[aZ]=(void 0);
+if(aU<aV){
+aQ[aU]=aQ[aV];
+aQ[aV]=(void 0);
 }
 }
-if(!(aU[aY]===(void 0)))aY++;
-var w;
-for(w=aY;w<p-ba;w++){
-aU[w]=(void 0);
+if(!(aQ[aU]===(void 0)))aU++;
+var t;
+for(t=aU;t<m-aW;t++){
+aQ[t]=(void 0);
 }
-for(w=p-ba;w<p;w++){
-if(w in %object_get_prototype_of(aU)){
-aU[w]=(void 0);
+for(t=m-aW;t<m;t++){
+if(t in %object_get_prototype_of(aQ)){
+aQ[t]=(void 0);
 }else{
-delete aU[w];
+delete aQ[t];
 }
 }
-return aY;
+return aU;
 };
-if(p<2)return o;
-var D=(%_IsArray(o));
-var bb;
-if(!D){
-bb=CopyFromPrototype(o,p);
+if(m<2)return l;
+var A=(%_IsArray(l));
+var aX;
+if(!A){
+aX=CopyFromPrototype(l,m);
 }
-var bc=%RemoveArrayHoles(o,p);
-if(bc==-1){
-bc=SafeRemoveArrayHoles(o);
+var aY=%RemoveArrayHoles(l,m);
+if(aY==-1){
+aY=SafeRemoveArrayHoles(l);
 }
-QuickSort(o,0,bc);
-if(!D&&(bc+1<bb)){
-ShadowPrototypeElements(o,bc,bb);
+QuickSort(l,0,aY);
+if(!A&&(aY+1<aX)){
+ShadowPrototypeElements(l,aY,aX);
 }
-return o;
+return l;
 }
-%DefineMethodsInternal(f.prototype,class{sort(aB){
-if(!(aB===(void 0))&&!(typeof(aB)==='function')){
-throw %make_type_error(17,aB);
+%DefineMethodsInternal(d.prototype,class{sort(aw){
+if(!(aw===(void 0))&&!(typeof(aw)==='function')){
+throw %make_type_error(18,aw);
 }
-var o=(%_ToObject(this));
-var p=(%_ToLength(o.length));
-return InnerArraySort(o,p,aB);
+var l=(%_ToObject(this));
+var m=(%_ToLength(l.length));
+return InnerArraySort(l,m,aw);
 }},-1);
-%DefineMethodsInternal(f.prototype,class{lastIndexOf(aE,X){
-var o=(%_ToObject(this));
-var p=(%_ToLength(this.length));
-if(p==0)return-1;
+%DefineMethodsInternal(d.prototype,class{lastIndexOf(aA,U){
+var l=(%_ToObject(this));
+var m=(%_ToLength(this.length));
+if(m==0)return-1;
 if(arguments.length<2){
-X=p-1;
+U=m-1;
 }else{
-X=(((%_ToInteger(X)))+0)
+U=(((%_ToInteger(U)))+0)
 ;
-if(X<0)X+=p;
-if(X<0)return-1;
-else if(X>=p)X=p-1;
+if(U<0)U+=m;
+if(U<0)return-1;
+else if(U>=m)U=m-1;
 }
-var bd=0;
-var aV=X;
-if(UseSparseVariant(o,p,(%_IsArray(o)),X)){
-%NormalizeElements(o);
-var t=%GetArrayKeys(o,X+1);
-if((typeof(t)==='number')){
-aV=t;
+var aZ=0;
+var aR=U;
+if(UseSparseVariant(l,m,(%_IsArray(l)),U)){
+%NormalizeElements(l);
+var q=%GetArrayKeys(l,U+1);
+if((typeof(q)==='number')){
+aR=q;
 }else{
-if(t.length==0)return-1;
-var be=GetSortedArrayKeys(o,t);
-var w=be.length-1;
-while(w>=0){
-var C=be[w];
-if(o[C]===aE)return C;
-w--;
+if(q.length==0)return-1;
+var ba=GetSortedArrayKeys(l,q);
+var t=ba.length-1;
+while(t>=0){
+var z=ba[t];
+if(l[z]===aA)return z;
+t--;
 }
 return-1;
 }
 }
-if(!(aE===(void 0))){
-for(var w=aV;w>=bd;w--){
-if(o[w]===aE)return w;
+if(!(aA===(void 0))){
+for(var t=aR;t>=aZ;t--){
+if(l[t]===aA)return t;
 }
 return-1;
 }
-for(var w=aV;w>=bd;w--){
-if((o[w]===(void 0))&&w in o){
-return w;
+for(var t=aR;t>=aZ;t--){
+if((l[t]===(void 0))&&t in l){
+return t;
 }
 }
 return-1;
 }},1);
-%DefineMethodsInternal(f.prototype,class{copyWithin(target,as,at){
-var o=(%_ToObject(this));
-var p=(%_ToLength(o.length));
+%DefineMethodsInternal(d.prototype,class{copyWithin(target,ap,aq){
+var l=(%_ToObject(this));
+var m=(%_ToLength(l.length));
 target=(%_ToInteger(target));
-var aD;
+var az;
 if(target<0){
-aD=h(p+target,0);
+az=f(m+target,0);
 }else{
-aD=i(target,p);
+az=g(target,m);
 }
-as=(%_ToInteger(as));
-var n;
-if(as<0){
-n=h(p+as,0);
+ap=(%_ToInteger(ap));
+var ay;
+if(ap<0){
+ay=f(m+ap,0);
 }else{
-n=i(as,p);
+ay=g(ap,m);
 }
-at=(at===(void 0))?p:(%_ToInteger(at));
-var bf;
-if(at<0){
-bf=h(p+at,0);
+aq=(aq===(void 0))?m:(%_ToInteger(aq));
+var bb;
+if(aq<0){
+bb=f(m+aq,0);
 }else{
-bf=i(at,p);
+bb=g(aq,m);
 }
-var bg=i(bf-n,p-aD);
-var bh=1;
-if(n<aD&&aD<(n+bg)){
-bh=-1;
-n=n+bg-1;
-aD=aD+bg-1;
+var bc=g(bb-ay,m-az);
+var bd=1;
+if(ay<az&&az<(ay+bc)){
+bd=-1;
+ay=ay+bc-1;
+az=az+bc-1;
 }
-while(bg>0){
-if(n in o){
-o[aD]=o[n];
+while(bc>0){
+if(ay in l){
+l[az]=l[ay];
 }else{
-delete o[aD];
+delete l[az];
 }
-n=n+bh;
-aD=aD+bh;
-bg--;
+ay=ay+bd;
+az=az+bd;
+bc--;
 }
-return o;
+return l;
 }},2);
-%DefineMethodsInternal(f.prototype,class{fill(I,as,at){
-var o=(%_ToObject(this));
-var p=(%_ToLength(o.length));
-var w=(as===(void 0))?0:(%_ToInteger(as));
-var at=(at===(void 0))?p:(%_ToInteger(at));
-if(w<0){
-w+=p;
-if(w<0)w=0;
+%DefineMethodsInternal(d.prototype,class{fill(F,ap,aq){
+var l=(%_ToObject(this));
+var m=(%_ToLength(l.length));
+var t=(ap===(void 0))?0:(%_ToInteger(ap));
+var aq=(aq===(void 0))?m:(%_ToInteger(aq));
+if(t<0){
+t+=m;
+if(t<0)t=0;
 }else{
-if(w>p)w=p;
+if(t>m)t=m;
 }
-if(at<0){
-at+=p;
-if(at<0)at=0;
+if(aq<0){
+aq+=m;
+if(aq<0)aq=0;
 }else{
-if(at>p)at=p;
+if(aq>m)aq=m;
 }
-if((at-w)>0&&%object_is_frozen(o)){
-throw %make_type_error(13);
+if((aq-t)>0&&%object_is_frozen(l)){
+throw %make_type_error(14);
 }
-for(;w<at;w++)
-o[w]=I;
-return o;
+for(;t<aq;t++)
+l[t]=F;
+return l;
 }},1);
-%DefineMethodsInternal(f,class{'from'(arrayLike,mapfn,receiver){
-var bi=(%_ToObject(arrayLike));
-var bj=!(mapfn===(void 0));
-if(bj){
-if(!(typeof(mapfn)==='function')){
-throw %make_type_error(24,mapfn);
-}
-}
-var bk=e(bi,l);
-var S;
-var av;
-var bl;
-var bm;
-if(!(bk===(void 0))){
-av=%IsConstructor(this)?new this():[];
-S=0;
-for(bm of
-{[l](){return d(bi,bk)}}){
-if(bj){
-bl=%_Call(mapfn,receiver,bm,S);
-}else{
-bl=bm;
-}
-%CreateDataProperty(av,S,bl);
-S++;
-}
-av.length=S;
-return av;
-}else{
-var P=(%_ToLength(bi.length));
-av=%IsConstructor(this)?new this(P):new f(P);
-for(S=0;S<P;++S){
-bm=bi[S];
-if(bj){
-bl=%_Call(mapfn,receiver,bm,S);
-}else{
-bl=bm;
-}
-%CreateDataProperty(av,S,bl);
-}
-av.length=S;
-return av;
-}
-}},1);
-%DefineMethodsInternal(f,class{of(...args){
-var p=args.length;
-var q=this;
-var o=%IsConstructor(q)?new q(p):[];
-for(var w=0;w<p;w++){
-%CreateDataProperty(o,w,args[w]);
-}
-o.length=p;
-return o;
-}},-1);
-var bn={
+var be={
 __proto__:null,
 copyWithin:true,
 entries:true,
@@ -3882,1172 +3321,128 @@ findIndex:true,
 includes:true,
 keys:true,
 };
-%ToFastProperties(bn);
-%AddNamedProperty(f.prototype,m,bn,
+%ToFastProperties(be);
+%AddNamedProperty(d.prototype,k,be,
 2|1);
-var bo=f.prototype.indexOf;
-var aa=f.prototype.join;
-var bp=f.prototype.pop;
-var bq=f.prototype.push;
-var br=f.prototype.slice;
-var bs=f.prototype.shift;
-var bt=f.prototype.sort;
-var bu=f.prototype.splice;
-var bv=f.prototype.toString;
-var bw=f.prototype.unshift;
-var bx=f.prototype.entries;
-var by=f.prototype.forEach;
-var bz=f.prototype.keys;
-var bA=f.prototype[l];
-b.SetUpLockedPrototype(g,f(),[
-"indexOf",bo,
-"join",aa,
-"pop",bp,
-"push",bq,
-"shift",bs,
-"sort",bt,
-"splice",bu
+var bf=d.prototype.indexOf;
+var X=d.prototype.join;
+var bg=d.prototype.pop;
+var bh=d.prototype.push;
+var bi=d.prototype.slice;
+var bj=d.prototype.shift;
+var bk=d.prototype.sort;
+var bl=d.prototype.splice;
+var bm=d.prototype.toString;
+var bn=d.prototype.unshift;
+var bo=d.prototype.entries;
+var bp=d.prototype.forEach;
+var bq=d.prototype.keys;
+var br=d.prototype[j];
+b.SetUpLockedPrototype(e,d(),[
+"indexOf",bf,
+"join",X,
+"pop",bg,
+"push",bh,
+"shift",bj,
+"sort",bk,
+"splice",bl
 ]);
-b.SetUpLockedPrototype(c.InternalPackedArray,f(),[
-"push",bq,
-"pop",bp,
-"shift",bs,
-"unshift",bw,
-"splice",bu,
-"slice",br
+b.SetUpLockedPrototype(c.InternalPackedArray,d(),[
+"push",bh,
+"pop",bg,
+"shift",bj,
+"unshift",bn,
+"splice",bl,
+"slice",bi
 ]);
-b.Export(function(aD){
-aD.ArrayJoin=aa;
-aD.ArrayPush=bq;
-aD.ArrayToString=bv;
-aD.ArrayValues=bA;
-aD.InnerArrayJoin=InnerArrayJoin;
-aD.InnerArraySort=InnerArraySort;
-aD.InnerArrayToLocaleString=InnerArrayToLocaleString;
+b.Export(function(az){
+az.ArrayJoin=X;
+az.ArrayPush=bh;
+az.ArrayToString=bm;
+az.ArrayValues=br;
+az.InnerArrayJoin=InnerArrayJoin;
+az.InnerArraySort=InnerArraySort;
+az.InnerArrayToLocaleString=InnerArrayToLocaleString;
 });
 %InstallToContext([
-"array_entries_iterator",bx,
-"array_for_each_iterator",by,
-"array_keys_iterator",bz,
-"array_values_iterator",bA,
+"array_entries_iterator",bo,
+"array_for_each_iterator",bp,
+"array_keys_iterator",bq,
+"array_values_iterator",br,
 "array_pop",ArrayPopFallback,
 "array_push",ArrayPushFallback,
 "array_shift",ArrayShiftFallback,
 "array_splice",ArraySpliceFallback,
-"array_slice",ArraySliceFallback,
 "array_unshift",ArrayUnshiftFallback,
 ]);
 });
 
-(typedarray"G
+(typedarrayI
 (function(a,b){
 "use strict";
 %CheckIsBootstrapping();
 var c=b.ImportNow("ArrayToString");
 var d;
 var e;
-var f=a.Array;
-var g=a.ArrayBuffer;
-var h=g.prototype;
-var i=a.Object;
-var j;
-var k;
-var l;
-var m=b.InternalArray;
-var n=a.Math.max;
-var o=a.Math.min;
-var p=b.ImportNow("iterator_symbol");
-var q=b.ImportNow("species_symbol");
-var r=b.ImportNow("to_string_tag_symbol");
-var s=a.Uint8Array;
+var f;
+var g=a.Uint8Array;
 
-var t=a.Int8Array;
+var h=a.Int8Array;
 
-var u=a.Uint16Array;
+var i=a.Uint16Array;
 
-var v=a.Int16Array;
+var j=a.Int16Array;
 
-var w=a.Uint32Array;
+var k=a.Uint32Array;
 
-var x=a.Int32Array;
+var l=a.Int32Array;
 
-var y=a.Float32Array;
+var m=a.Float32Array;
 
-var z=a.Float64Array;
+var n=a.Float64Array;
 
-var A=a.Uint8ClampedArray;
+var o=a.Uint8ClampedArray;
+
+var p=a.BigUint64Array;
+
+var q=a.BigInt64Array;
 
 
-var B=%object_get_prototype_of(s);
-b.Import(function(C){
-d=C.GetIterator;
-e=C.GetMethod;
-j=C.InnerArrayJoin;
-k=C.InnerArraySort;
-l=C.InnerArrayToLocaleString;
+var r=%object_get_prototype_of(g);
+b.Import(function(s){
+d=s.InnerArrayJoin;
+e=s.InnerArraySort;
+f=s.InnerArrayToLocaleString;
 });
-function SpeciesConstructor(D,E){
-var F=D.constructor;
-if((F===(void 0))){
-return E;
-}
-if(!(%_IsJSReceiver(F))){
-throw %make_type_error(40);
-}
-var G=F[q];
-if((G==null)){
-return E;
-}
-if(%IsConstructor(G)){
-return G;
-}
-throw %make_type_error(264);
-}
-function ValidateTypedArray(H,I){
-if(!(%_IsTypedArray(H))
-)throw %make_type_error(90);
-if(%_ArrayBufferViewWasNeutered(H))
-throw %make_type_error(49,I);
-}
-function TypedArrayDefaultConstructor(J){
-switch(%_ClassOf(J)){
-case"Uint8Array":
-return s;
-
-case"Int8Array":
-return t;
-
-case"Uint16Array":
-return u;
-
-case"Int16Array":
-return v;
-
-case"Uint32Array":
-return w;
-
-case"Int32Array":
-return x;
-
-case"Float32Array":
-return y;
-
-case"Float64Array":
-return z;
-
-case"Uint8ClampedArray":
-return A;
-
-
-}
-throw %make_type_error(60,
-"TypedArrayDefaultConstructor",this);
-}
-function TypedArrayCreate(F,K,L,M){
-if((L===(void 0))){
-var N=new F(K);
-}else{
-var N=new F(K,L,M);
-}
-ValidateTypedArray(N,"TypedArrayCreate");
-if((typeof(K)==='number')&&%_TypedArrayGetLength(N)<K){
-throw %make_type_error(280);
-}
-return N;
-}
-function TypedArraySpeciesCreate(O,K,L,M){
-var E=TypedArrayDefaultConstructor(O);
-var F=SpeciesConstructor(O,E);
-return TypedArrayCreate(F,K,L,M);
-}
-function Uint8ArrayConstructByIterable(P,Q,R){
-if(%IterableToListCanBeElided(Q)){
-%typed_array_construct_by_array_like(
-P,Q,Q.length,1);
-}else{
-var S=new m();
-var T=%_Call(R,Q);
-var U={
-__proto__:null
-};
-U[p]=function(){return T;}
-for(var V of U){
-S.push(V);
-}
-%typed_array_construct_by_array_like(P,S,S.length,1);
-}
-}
-function Uint8ArrayConstructByTypedArray(P,J){
-var W=%TypedArrayGetBuffer(J);
-var X=%_TypedArrayGetLength(J);
-var Y=%_ArrayBufferViewGetByteLength(J);
-var Z=X*1;
-%typed_array_construct_by_array_like(P,J,X,1);
-var aa=(%_ClassOf(W)==='SharedArrayBuffer')
-
-?g
-:SpeciesConstructor(W,g);
-var ab=aa.prototype;
-if((%_IsJSReceiver(ab))&&ab!==h){
-%InternalSetPrototype(%TypedArrayGetBuffer(P),ab);
-}
-}
-function Uint8ArrayConstructor(L,M,ac){
-if(!(new.target===(void 0))){
-if((%_ClassOf(L)==='ArrayBuffer')
-||(%_ClassOf(L)==='SharedArrayBuffer')
-){
-%typed_array_construct_by_array_buffer(
-this,L,M,ac,1);
-}else if((%_IsTypedArray(L))
-){
-Uint8ArrayConstructByTypedArray(this,L);
-}else if((%_IsJSReceiver(L))){
-var R=L[p];
-if((R===(void 0))){
-%typed_array_construct_by_array_like(
-this,L,L.length,1);
-}else{
-Uint8ArrayConstructByIterable(this,L,R);
-}
-}else{
-%typed_array_construct_by_length(this,L,1);
-}
-}else{
-throw %make_type_error(39,"Uint8Array")
-}
-}
-function Uint8ArraySubArray(ad,ae){
-var af=(%_ToInteger(ad));
-if(!(ae===(void 0))){
-var ag=(%_ToInteger(ae));
-var ah=%_TypedArrayGetLength(this);
-}else{
-var ah=%_TypedArrayGetLength(this);
-var ag=ah;
-}
-if(af<0){
-af=n(0,ah+af);
-}else{
-af=o(af,ah);
-}
-if(ag<0){
-ag=n(0,ah+ag);
-}else{
-ag=o(ag,ah);
-}
-if(ag<af){
-ag=af;
-}
-var ai=ag-af;
-var aj=
-%_ArrayBufferViewGetByteOffset(this)+af*1;
-return TypedArraySpeciesCreate(this,%TypedArrayGetBuffer(this),
-aj,ai);
-}
-
-function Int8ArrayConstructByIterable(P,Q,R){
-if(%IterableToListCanBeElided(Q)){
-%typed_array_construct_by_array_like(
-P,Q,Q.length,1);
-}else{
-var S=new m();
-var T=%_Call(R,Q);
-var U={
-__proto__:null
-};
-U[p]=function(){return T;}
-for(var V of U){
-S.push(V);
-}
-%typed_array_construct_by_array_like(P,S,S.length,1);
-}
-}
-function Int8ArrayConstructByTypedArray(P,J){
-var W=%TypedArrayGetBuffer(J);
-var X=%_TypedArrayGetLength(J);
-var Y=%_ArrayBufferViewGetByteLength(J);
-var Z=X*1;
-%typed_array_construct_by_array_like(P,J,X,1);
-var aa=(%_ClassOf(W)==='SharedArrayBuffer')
-
-?g
-:SpeciesConstructor(W,g);
-var ab=aa.prototype;
-if((%_IsJSReceiver(ab))&&ab!==h){
-%InternalSetPrototype(%TypedArrayGetBuffer(P),ab);
-}
-}
-function Int8ArrayConstructor(L,M,ac){
-if(!(new.target===(void 0))){
-if((%_ClassOf(L)==='ArrayBuffer')
-||(%_ClassOf(L)==='SharedArrayBuffer')
-){
-%typed_array_construct_by_array_buffer(
-this,L,M,ac,1);
-}else if((%_IsTypedArray(L))
-){
-Int8ArrayConstructByTypedArray(this,L);
-}else if((%_IsJSReceiver(L))){
-var R=L[p];
-if((R===(void 0))){
-%typed_array_construct_by_array_like(
-this,L,L.length,1);
-}else{
-Int8ArrayConstructByIterable(this,L,R);
-}
-}else{
-%typed_array_construct_by_length(this,L,1);
-}
-}else{
-throw %make_type_error(39,"Int8Array")
-}
-}
-function Int8ArraySubArray(ad,ae){
-var af=(%_ToInteger(ad));
-if(!(ae===(void 0))){
-var ag=(%_ToInteger(ae));
-var ah=%_TypedArrayGetLength(this);
-}else{
-var ah=%_TypedArrayGetLength(this);
-var ag=ah;
-}
-if(af<0){
-af=n(0,ah+af);
-}else{
-af=o(af,ah);
-}
-if(ag<0){
-ag=n(0,ah+ag);
-}else{
-ag=o(ag,ah);
-}
-if(ag<af){
-ag=af;
-}
-var ai=ag-af;
-var aj=
-%_ArrayBufferViewGetByteOffset(this)+af*1;
-return TypedArraySpeciesCreate(this,%TypedArrayGetBuffer(this),
-aj,ai);
-}
-
-function Uint16ArrayConstructByIterable(P,Q,R){
-if(%IterableToListCanBeElided(Q)){
-%typed_array_construct_by_array_like(
-P,Q,Q.length,2);
-}else{
-var S=new m();
-var T=%_Call(R,Q);
-var U={
-__proto__:null
-};
-U[p]=function(){return T;}
-for(var V of U){
-S.push(V);
-}
-%typed_array_construct_by_array_like(P,S,S.length,2);
-}
-}
-function Uint16ArrayConstructByTypedArray(P,J){
-var W=%TypedArrayGetBuffer(J);
-var X=%_TypedArrayGetLength(J);
-var Y=%_ArrayBufferViewGetByteLength(J);
-var Z=X*2;
-%typed_array_construct_by_array_like(P,J,X,2);
-var aa=(%_ClassOf(W)==='SharedArrayBuffer')
-
-?g
-:SpeciesConstructor(W,g);
-var ab=aa.prototype;
-if((%_IsJSReceiver(ab))&&ab!==h){
-%InternalSetPrototype(%TypedArrayGetBuffer(P),ab);
-}
-}
-function Uint16ArrayConstructor(L,M,ac){
-if(!(new.target===(void 0))){
-if((%_ClassOf(L)==='ArrayBuffer')
-||(%_ClassOf(L)==='SharedArrayBuffer')
-){
-%typed_array_construct_by_array_buffer(
-this,L,M,ac,2);
-}else if((%_IsTypedArray(L))
-){
-Uint16ArrayConstructByTypedArray(this,L);
-}else if((%_IsJSReceiver(L))){
-var R=L[p];
-if((R===(void 0))){
-%typed_array_construct_by_array_like(
-this,L,L.length,2);
-}else{
-Uint16ArrayConstructByIterable(this,L,R);
-}
-}else{
-%typed_array_construct_by_length(this,L,2);
-}
-}else{
-throw %make_type_error(39,"Uint16Array")
-}
-}
-function Uint16ArraySubArray(ad,ae){
-var af=(%_ToInteger(ad));
-if(!(ae===(void 0))){
-var ag=(%_ToInteger(ae));
-var ah=%_TypedArrayGetLength(this);
-}else{
-var ah=%_TypedArrayGetLength(this);
-var ag=ah;
-}
-if(af<0){
-af=n(0,ah+af);
-}else{
-af=o(af,ah);
-}
-if(ag<0){
-ag=n(0,ah+ag);
-}else{
-ag=o(ag,ah);
-}
-if(ag<af){
-ag=af;
-}
-var ai=ag-af;
-var aj=
-%_ArrayBufferViewGetByteOffset(this)+af*2;
-return TypedArraySpeciesCreate(this,%TypedArrayGetBuffer(this),
-aj,ai);
-}
-
-function Int16ArrayConstructByIterable(P,Q,R){
-if(%IterableToListCanBeElided(Q)){
-%typed_array_construct_by_array_like(
-P,Q,Q.length,2);
-}else{
-var S=new m();
-var T=%_Call(R,Q);
-var U={
-__proto__:null
-};
-U[p]=function(){return T;}
-for(var V of U){
-S.push(V);
-}
-%typed_array_construct_by_array_like(P,S,S.length,2);
-}
-}
-function Int16ArrayConstructByTypedArray(P,J){
-var W=%TypedArrayGetBuffer(J);
-var X=%_TypedArrayGetLength(J);
-var Y=%_ArrayBufferViewGetByteLength(J);
-var Z=X*2;
-%typed_array_construct_by_array_like(P,J,X,2);
-var aa=(%_ClassOf(W)==='SharedArrayBuffer')
-
-?g
-:SpeciesConstructor(W,g);
-var ab=aa.prototype;
-if((%_IsJSReceiver(ab))&&ab!==h){
-%InternalSetPrototype(%TypedArrayGetBuffer(P),ab);
-}
-}
-function Int16ArrayConstructor(L,M,ac){
-if(!(new.target===(void 0))){
-if((%_ClassOf(L)==='ArrayBuffer')
-||(%_ClassOf(L)==='SharedArrayBuffer')
-){
-%typed_array_construct_by_array_buffer(
-this,L,M,ac,2);
-}else if((%_IsTypedArray(L))
-){
-Int16ArrayConstructByTypedArray(this,L);
-}else if((%_IsJSReceiver(L))){
-var R=L[p];
-if((R===(void 0))){
-%typed_array_construct_by_array_like(
-this,L,L.length,2);
-}else{
-Int16ArrayConstructByIterable(this,L,R);
-}
-}else{
-%typed_array_construct_by_length(this,L,2);
-}
-}else{
-throw %make_type_error(39,"Int16Array")
-}
-}
-function Int16ArraySubArray(ad,ae){
-var af=(%_ToInteger(ad));
-if(!(ae===(void 0))){
-var ag=(%_ToInteger(ae));
-var ah=%_TypedArrayGetLength(this);
-}else{
-var ah=%_TypedArrayGetLength(this);
-var ag=ah;
-}
-if(af<0){
-af=n(0,ah+af);
-}else{
-af=o(af,ah);
-}
-if(ag<0){
-ag=n(0,ah+ag);
-}else{
-ag=o(ag,ah);
-}
-if(ag<af){
-ag=af;
-}
-var ai=ag-af;
-var aj=
-%_ArrayBufferViewGetByteOffset(this)+af*2;
-return TypedArraySpeciesCreate(this,%TypedArrayGetBuffer(this),
-aj,ai);
-}
-
-function Uint32ArrayConstructByIterable(P,Q,R){
-if(%IterableToListCanBeElided(Q)){
-%typed_array_construct_by_array_like(
-P,Q,Q.length,4);
-}else{
-var S=new m();
-var T=%_Call(R,Q);
-var U={
-__proto__:null
-};
-U[p]=function(){return T;}
-for(var V of U){
-S.push(V);
-}
-%typed_array_construct_by_array_like(P,S,S.length,4);
-}
-}
-function Uint32ArrayConstructByTypedArray(P,J){
-var W=%TypedArrayGetBuffer(J);
-var X=%_TypedArrayGetLength(J);
-var Y=%_ArrayBufferViewGetByteLength(J);
-var Z=X*4;
-%typed_array_construct_by_array_like(P,J,X,4);
-var aa=(%_ClassOf(W)==='SharedArrayBuffer')
-
-?g
-:SpeciesConstructor(W,g);
-var ab=aa.prototype;
-if((%_IsJSReceiver(ab))&&ab!==h){
-%InternalSetPrototype(%TypedArrayGetBuffer(P),ab);
-}
-}
-function Uint32ArrayConstructor(L,M,ac){
-if(!(new.target===(void 0))){
-if((%_ClassOf(L)==='ArrayBuffer')
-||(%_ClassOf(L)==='SharedArrayBuffer')
-){
-%typed_array_construct_by_array_buffer(
-this,L,M,ac,4);
-}else if((%_IsTypedArray(L))
-){
-Uint32ArrayConstructByTypedArray(this,L);
-}else if((%_IsJSReceiver(L))){
-var R=L[p];
-if((R===(void 0))){
-%typed_array_construct_by_array_like(
-this,L,L.length,4);
-}else{
-Uint32ArrayConstructByIterable(this,L,R);
-}
-}else{
-%typed_array_construct_by_length(this,L,4);
-}
-}else{
-throw %make_type_error(39,"Uint32Array")
-}
-}
-function Uint32ArraySubArray(ad,ae){
-var af=(%_ToInteger(ad));
-if(!(ae===(void 0))){
-var ag=(%_ToInteger(ae));
-var ah=%_TypedArrayGetLength(this);
-}else{
-var ah=%_TypedArrayGetLength(this);
-var ag=ah;
-}
-if(af<0){
-af=n(0,ah+af);
-}else{
-af=o(af,ah);
-}
-if(ag<0){
-ag=n(0,ah+ag);
-}else{
-ag=o(ag,ah);
-}
-if(ag<af){
-ag=af;
-}
-var ai=ag-af;
-var aj=
-%_ArrayBufferViewGetByteOffset(this)+af*4;
-return TypedArraySpeciesCreate(this,%TypedArrayGetBuffer(this),
-aj,ai);
-}
-
-function Int32ArrayConstructByIterable(P,Q,R){
-if(%IterableToListCanBeElided(Q)){
-%typed_array_construct_by_array_like(
-P,Q,Q.length,4);
-}else{
-var S=new m();
-var T=%_Call(R,Q);
-var U={
-__proto__:null
-};
-U[p]=function(){return T;}
-for(var V of U){
-S.push(V);
-}
-%typed_array_construct_by_array_like(P,S,S.length,4);
-}
-}
-function Int32ArrayConstructByTypedArray(P,J){
-var W=%TypedArrayGetBuffer(J);
-var X=%_TypedArrayGetLength(J);
-var Y=%_ArrayBufferViewGetByteLength(J);
-var Z=X*4;
-%typed_array_construct_by_array_like(P,J,X,4);
-var aa=(%_ClassOf(W)==='SharedArrayBuffer')
-
-?g
-:SpeciesConstructor(W,g);
-var ab=aa.prototype;
-if((%_IsJSReceiver(ab))&&ab!==h){
-%InternalSetPrototype(%TypedArrayGetBuffer(P),ab);
-}
-}
-function Int32ArrayConstructor(L,M,ac){
-if(!(new.target===(void 0))){
-if((%_ClassOf(L)==='ArrayBuffer')
-||(%_ClassOf(L)==='SharedArrayBuffer')
-){
-%typed_array_construct_by_array_buffer(
-this,L,M,ac,4);
-}else if((%_IsTypedArray(L))
-){
-Int32ArrayConstructByTypedArray(this,L);
-}else if((%_IsJSReceiver(L))){
-var R=L[p];
-if((R===(void 0))){
-%typed_array_construct_by_array_like(
-this,L,L.length,4);
-}else{
-Int32ArrayConstructByIterable(this,L,R);
-}
-}else{
-%typed_array_construct_by_length(this,L,4);
-}
-}else{
-throw %make_type_error(39,"Int32Array")
-}
-}
-function Int32ArraySubArray(ad,ae){
-var af=(%_ToInteger(ad));
-if(!(ae===(void 0))){
-var ag=(%_ToInteger(ae));
-var ah=%_TypedArrayGetLength(this);
-}else{
-var ah=%_TypedArrayGetLength(this);
-var ag=ah;
-}
-if(af<0){
-af=n(0,ah+af);
-}else{
-af=o(af,ah);
-}
-if(ag<0){
-ag=n(0,ah+ag);
-}else{
-ag=o(ag,ah);
-}
-if(ag<af){
-ag=af;
-}
-var ai=ag-af;
-var aj=
-%_ArrayBufferViewGetByteOffset(this)+af*4;
-return TypedArraySpeciesCreate(this,%TypedArrayGetBuffer(this),
-aj,ai);
-}
-
-function Float32ArrayConstructByIterable(P,Q,R){
-if(%IterableToListCanBeElided(Q)){
-%typed_array_construct_by_array_like(
-P,Q,Q.length,4);
-}else{
-var S=new m();
-var T=%_Call(R,Q);
-var U={
-__proto__:null
-};
-U[p]=function(){return T;}
-for(var V of U){
-S.push(V);
-}
-%typed_array_construct_by_array_like(P,S,S.length,4);
-}
-}
-function Float32ArrayConstructByTypedArray(P,J){
-var W=%TypedArrayGetBuffer(J);
-var X=%_TypedArrayGetLength(J);
-var Y=%_ArrayBufferViewGetByteLength(J);
-var Z=X*4;
-%typed_array_construct_by_array_like(P,J,X,4);
-var aa=(%_ClassOf(W)==='SharedArrayBuffer')
-
-?g
-:SpeciesConstructor(W,g);
-var ab=aa.prototype;
-if((%_IsJSReceiver(ab))&&ab!==h){
-%InternalSetPrototype(%TypedArrayGetBuffer(P),ab);
-}
-}
-function Float32ArrayConstructor(L,M,ac){
-if(!(new.target===(void 0))){
-if((%_ClassOf(L)==='ArrayBuffer')
-||(%_ClassOf(L)==='SharedArrayBuffer')
-){
-%typed_array_construct_by_array_buffer(
-this,L,M,ac,4);
-}else if((%_IsTypedArray(L))
-){
-Float32ArrayConstructByTypedArray(this,L);
-}else if((%_IsJSReceiver(L))){
-var R=L[p];
-if((R===(void 0))){
-%typed_array_construct_by_array_like(
-this,L,L.length,4);
-}else{
-Float32ArrayConstructByIterable(this,L,R);
-}
-}else{
-%typed_array_construct_by_length(this,L,4);
-}
-}else{
-throw %make_type_error(39,"Float32Array")
-}
-}
-function Float32ArraySubArray(ad,ae){
-var af=(%_ToInteger(ad));
-if(!(ae===(void 0))){
-var ag=(%_ToInteger(ae));
-var ah=%_TypedArrayGetLength(this);
-}else{
-var ah=%_TypedArrayGetLength(this);
-var ag=ah;
-}
-if(af<0){
-af=n(0,ah+af);
-}else{
-af=o(af,ah);
-}
-if(ag<0){
-ag=n(0,ah+ag);
-}else{
-ag=o(ag,ah);
-}
-if(ag<af){
-ag=af;
-}
-var ai=ag-af;
-var aj=
-%_ArrayBufferViewGetByteOffset(this)+af*4;
-return TypedArraySpeciesCreate(this,%TypedArrayGetBuffer(this),
-aj,ai);
-}
-
-function Float64ArrayConstructByIterable(P,Q,R){
-if(%IterableToListCanBeElided(Q)){
-%typed_array_construct_by_array_like(
-P,Q,Q.length,8);
-}else{
-var S=new m();
-var T=%_Call(R,Q);
-var U={
-__proto__:null
-};
-U[p]=function(){return T;}
-for(var V of U){
-S.push(V);
-}
-%typed_array_construct_by_array_like(P,S,S.length,8);
-}
-}
-function Float64ArrayConstructByTypedArray(P,J){
-var W=%TypedArrayGetBuffer(J);
-var X=%_TypedArrayGetLength(J);
-var Y=%_ArrayBufferViewGetByteLength(J);
-var Z=X*8;
-%typed_array_construct_by_array_like(P,J,X,8);
-var aa=(%_ClassOf(W)==='SharedArrayBuffer')
-
-?g
-:SpeciesConstructor(W,g);
-var ab=aa.prototype;
-if((%_IsJSReceiver(ab))&&ab!==h){
-%InternalSetPrototype(%TypedArrayGetBuffer(P),ab);
-}
-}
-function Float64ArrayConstructor(L,M,ac){
-if(!(new.target===(void 0))){
-if((%_ClassOf(L)==='ArrayBuffer')
-||(%_ClassOf(L)==='SharedArrayBuffer')
-){
-%typed_array_construct_by_array_buffer(
-this,L,M,ac,8);
-}else if((%_IsTypedArray(L))
-){
-Float64ArrayConstructByTypedArray(this,L);
-}else if((%_IsJSReceiver(L))){
-var R=L[p];
-if((R===(void 0))){
-%typed_array_construct_by_array_like(
-this,L,L.length,8);
-}else{
-Float64ArrayConstructByIterable(this,L,R);
-}
-}else{
-%typed_array_construct_by_length(this,L,8);
-}
-}else{
-throw %make_type_error(39,"Float64Array")
-}
-}
-function Float64ArraySubArray(ad,ae){
-var af=(%_ToInteger(ad));
-if(!(ae===(void 0))){
-var ag=(%_ToInteger(ae));
-var ah=%_TypedArrayGetLength(this);
-}else{
-var ah=%_TypedArrayGetLength(this);
-var ag=ah;
-}
-if(af<0){
-af=n(0,ah+af);
-}else{
-af=o(af,ah);
-}
-if(ag<0){
-ag=n(0,ah+ag);
-}else{
-ag=o(ag,ah);
-}
-if(ag<af){
-ag=af;
-}
-var ai=ag-af;
-var aj=
-%_ArrayBufferViewGetByteOffset(this)+af*8;
-return TypedArraySpeciesCreate(this,%TypedArrayGetBuffer(this),
-aj,ai);
-}
-
-function Uint8ClampedArrayConstructByIterable(P,Q,R){
-if(%IterableToListCanBeElided(Q)){
-%typed_array_construct_by_array_like(
-P,Q,Q.length,1);
-}else{
-var S=new m();
-var T=%_Call(R,Q);
-var U={
-__proto__:null
-};
-U[p]=function(){return T;}
-for(var V of U){
-S.push(V);
-}
-%typed_array_construct_by_array_like(P,S,S.length,1);
-}
-}
-function Uint8ClampedArrayConstructByTypedArray(P,J){
-var W=%TypedArrayGetBuffer(J);
-var X=%_TypedArrayGetLength(J);
-var Y=%_ArrayBufferViewGetByteLength(J);
-var Z=X*1;
-%typed_array_construct_by_array_like(P,J,X,1);
-var aa=(%_ClassOf(W)==='SharedArrayBuffer')
-
-?g
-:SpeciesConstructor(W,g);
-var ab=aa.prototype;
-if((%_IsJSReceiver(ab))&&ab!==h){
-%InternalSetPrototype(%TypedArrayGetBuffer(P),ab);
-}
-}
-function Uint8ClampedArrayConstructor(L,M,ac){
-if(!(new.target===(void 0))){
-if((%_ClassOf(L)==='ArrayBuffer')
-||(%_ClassOf(L)==='SharedArrayBuffer')
-){
-%typed_array_construct_by_array_buffer(
-this,L,M,ac,1);
-}else if((%_IsTypedArray(L))
-){
-Uint8ClampedArrayConstructByTypedArray(this,L);
-}else if((%_IsJSReceiver(L))){
-var R=L[p];
-if((R===(void 0))){
-%typed_array_construct_by_array_like(
-this,L,L.length,1);
-}else{
-Uint8ClampedArrayConstructByIterable(this,L,R);
-}
-}else{
-%typed_array_construct_by_length(this,L,1);
-}
-}else{
-throw %make_type_error(39,"Uint8ClampedArray")
-}
-}
-function Uint8ClampedArraySubArray(ad,ae){
-var af=(%_ToInteger(ad));
-if(!(ae===(void 0))){
-var ag=(%_ToInteger(ae));
-var ah=%_TypedArrayGetLength(this);
-}else{
-var ah=%_TypedArrayGetLength(this);
-var ag=ah;
-}
-if(af<0){
-af=n(0,ah+af);
-}else{
-af=o(af,ah);
-}
-if(ag<0){
-ag=n(0,ah+ag);
-}else{
-ag=o(ag,ah);
-}
-if(ag<af){
-ag=af;
-}
-var ai=ag-af;
-var aj=
-%_ArrayBufferViewGetByteOffset(this)+af*1;
-return TypedArraySpeciesCreate(this,%TypedArrayGetBuffer(this),
-aj,ai);
-}
-
-
-%DefineMethodsInternal(B.prototype,class{subarray(ad,ae){
-switch(%_ClassOf(this)){
-case"Uint8Array":
-return %_Call(Uint8ArraySubArray,this,ad,ae);
-
-case"Int8Array":
-return %_Call(Int8ArraySubArray,this,ad,ae);
-
-case"Uint16Array":
-return %_Call(Uint16ArraySubArray,this,ad,ae);
-
-case"Int16Array":
-return %_Call(Int16ArraySubArray,this,ad,ae);
-
-case"Uint32Array":
-return %_Call(Uint32ArraySubArray,this,ad,ae);
-
-case"Int32Array":
-return %_Call(Int32ArraySubArray,this,ad,ae);
-
-case"Float32Array":
-return %_Call(Float32ArraySubArray,this,ad,ae);
-
-case"Float64Array":
-return %_Call(Float64ArraySubArray,this,ad,ae);
-
-case"Uint8ClampedArray":
-return %_Call(Uint8ClampedArraySubArray,this,ad,ae);
-
-
-}
-throw %make_type_error(60,
-"get %TypedArray%.prototype.subarray",this);
-}},-1);
-function InnerTypedArrayFilter(ak,al,H,X,am){
-var an=0;
-for(var ao=0;ao<X;ao++){
-if(ao in H){
-var ap=H[ao];
-if(%_Call(ak,al,ap,ao,H)){
-%CreateDataProperty(am,an,ap);
-an++;
-}
-}
-}
-return am;
-}
-%DefineMethodsInternal(B.prototype,class{filter(ak,thisArg){
-ValidateTypedArray(this,"%TypeArray%.prototype.filter");
-var X=%_TypedArrayGetLength(this);
-if(!(typeof(ak)==='function'))throw %make_type_error(24,ak);
-var am=new m();
-InnerTypedArrayFilter(ak,thisArg,this,X,am);
-var aq=am.length;
-var ar=TypedArraySpeciesCreate(this,aq);
-for(var ao=0;ao<aq;ao++){
-ar[ao]=am[ao];
-}
-return ar;
-}},1);
-%DefineMethodsInternal(B.prototype,class{sort(comparefn){
+function ValidateTypedArray(t,u){
+if(!(%_IsTypedArray(t))
+)throw %make_type_error(93);
+if(%_ArrayBufferViewWasNeutered(t))
+throw %make_type_error(50,u);
+}
+%DefineMethodsInternal(r.prototype,class{sort(comparefn){
 ValidateTypedArray(this,"%TypedArray%.prototype.sort");
 if(!(comparefn===(void 0))&&!(typeof(comparefn)==='function')){
-throw %make_type_error(17,comparefn);
+throw %make_type_error(18,comparefn);
 }
-var X=%_TypedArrayGetLength(this);
+var v=%_TypedArrayGetLength(this);
 if((comparefn===(void 0))){
 return %TypedArraySortFast(this);
 }
-return k(this,X,comparefn);
+return e(this,v,comparefn);
 }},-1);
-%DefineMethodsInternal(B.prototype,class{toLocaleString(){
+%DefineMethodsInternal(r.prototype,class{toLocaleString(){
 ValidateTypedArray(this,"%TypedArray%.prototype.toLocaleString");
-var X=%_TypedArrayGetLength(this);
-return l(this,X);
+var v=%_TypedArrayGetLength(this);
+return f(this,v);
 }},-1);
-%DefineMethodsInternal(B.prototype,class{join(separator){
+%DefineMethodsInternal(r.prototype,class{join(separator){
 ValidateTypedArray(this,"%TypedArray%.prototype.join");
-var X=%_TypedArrayGetLength(this);
-return j(separator,this,X);
+var v=%_TypedArrayGetLength(this);
+return d(separator,this,v);
 }},-1);
-%DefineMethodsInternal(B,class{of(){
-var X=arguments.length;
-var H=TypedArrayCreate(this,X);
-for(var ao=0;ao<X;ao++){
-H[ao]=arguments[ao];
-}
-return H;
-}},-1);
-function IterableToArrayLike(as){
-var Q=e(as,p);
-if(!(Q===(void 0))){
-var at=new m();
-var ao=0;
-for(var V of
-{[p](){return d(as,Q)}}){
-at[ao]=V;
-ao++;
-}
-var H=[];
-%MoveArrayContents(at,H);
-return H;
-}
-return(%_ToObject(as));
-}
-%DefineMethodsInternal(B,class{'from'(source,mapfn,thisArg){
-if(!%IsConstructor(this))throw %make_type_error(82,this);
-var au;
-if(!(mapfn===(void 0))){
-if(!(typeof(mapfn)==='function'))throw %make_type_error(24,this);
-au=true;
-}else{
-au=false;
-}
-var av=IterableToArrayLike(source);
-var X=(%_ToLength(av.length));
-var aw=TypedArrayCreate(this,X);
-var V,ax;
-for(var ao=0;ao<X;ao++){
-V=av[ao];
-if(au){
-ax=%_Call(mapfn,thisArg,V,ao);
-}else{
-ax=V;
-}
-aw[ao]=ax;
-}
-return aw;
-}},1);
-function TypedArrayConstructor(){
-throw %make_type_error(35,"TypedArray");
-}
-%SetCode(B,TypedArrayConstructor);
-%AddNamedProperty(B.prototype,"toString",c,
+%AddNamedProperty(r.prototype,"toString",c,
 2);
-%SetCode(s,Uint8ArrayConstructor);
-
-%SetCode(t,Int8ArrayConstructor);
-
-%SetCode(u,Uint16ArrayConstructor);
-
-%SetCode(v,Int16ArrayConstructor);
-
-%SetCode(w,Uint32ArrayConstructor);
-
-%SetCode(x,Int32ArrayConstructor);
-
-%SetCode(y,Float32ArrayConstructor);
-
-%SetCode(z,Float64ArrayConstructor);
-
-%SetCode(A,Uint8ClampedArrayConstructor);
-
-
-})
-
- messages}
-(function(a,b){
-"use strict";
-%CheckIsBootstrapping();
-var c=b.ImportNow("Script");
-function ScriptLocationFromPosition(position,
-include_resource_offset){
-return %ScriptPositionInfo(this,position,!!include_resource_offset);
-}
-function ScriptNameOrSourceURL(){
-if(this.source_url)return this.source_url;
-return this.name;
-}
-b.SetUpLockedPrototype(c,[
-"source",
-"name",
-"source_url",
-"source_mapping_url",
-"line_offset",
-"column_offset"
-],[
-"locationFromPosition",ScriptLocationFromPosition,
-"nameOrSourceURL",ScriptNameOrSourceURL,
-]
-);
-});
-
-spread5
-(function(a,b){
-"use strict";
-var c=b.InternalArray;
-function SpreadArguments(){
-var d=arguments.length;
-var e=new c();
-for(var f=0;f<d;++f){
-var g=arguments[f];
-var h=g.length;
-for(var i=0;i<h;++i){
-e.push(g[i]);
-}
-}
-return e;
-}
-function SpreadIterable(j){
-if((j==null)){
-throw %make_type_error(87,j);
-}
-var e=new c();
-for(var k of j){
-e.push(k);
-}
-return e;
-}
-%InstallToContext([
-"spread_arguments",SpreadArguments,
-"spread_iterable",SpreadIterable,
-]);
 })
 
 intlÊÙ
@@ -5129,7 +3524,7 @@ if(%IsInitializedIntlObjectOfType(fallback,E)){
 return fallback;
 }
 }
-throw %make_type_error(60,G,z);
+throw %make_type_error(61,G,z);
 }
 return z;
 }
@@ -5217,7 +3612,7 @@ return T;
 }
 function supportedLocalesOf(K,B,C){
 if((%regexp_internal_match(GetServiceRE(),K)===null)){
-throw %make_error(7,K);
+throw %make_error(8,K);
 }
 if((C===(void 0))){
 C={__proto__:null};
@@ -5228,7 +3623,7 @@ var U=C.localeMatcher;
 if(!(U===(void 0))){
 U=(%_ToString(U));
 if(U!=='lookup'&&U!=='best fit'){
-throw %make_range_error(192,U);
+throw %make_range_error(195,U);
 }
 }else{
 U='best fit';
@@ -5280,10 +3675,10 @@ case'number':
 ah=(%_ToNumber(ah));
 break;
 default:
-throw %make_error(8);
+throw %make_error(9);
 }
 if(!(af===(void 0))&&%ArrayIndexOf(af,ah,0)===-1){
-throw %make_range_error(202,ah,ab,ad);
+throw %make_range_error(208,ah,ab,ad);
 }
 return ah;
 }
@@ -5306,7 +3701,7 @@ return ai;
 }
 function lookupMatcher(K,V){
 if((%regexp_internal_match(GetServiceRE(),K)===null)){
-throw %make_error(7,K);
+throw %make_error(8,K);
 }
 var W=getAvailableLocalesOf(K);
 for(var Y=0;Y<V.length;++Y){
@@ -5471,7 +3866,7 @@ return %StringToUpperCaseIntl(%_Call(v,aC,0,1))+
 }
 function toTitleCaseTimezoneLocation(aD){
 var aE=%regexp_internal_match(GetTimezoneNameLocationPartRE(),aD)
-if((aE===null))throw %make_range_error(170,aD);
+if((aE===null))throw %make_range_error(173,aD);
 var aF=toTitleCaseWord(aE[1]);
 if(!(aE[2]===(void 0))&&2<aE.length){
 var aG=%_Call(w,aE[2],0,1);
@@ -5490,7 +3885,7 @@ return aF;
 function canonicalizeLanguageTag(aJ){
 if((!(typeof(aJ)==='string')&&!(%_IsJSReceiver(aJ)))||
 (aJ===null)){
-throw %make_type_error(67);
+throw %make_type_error(69);
 }
 if((typeof(aJ)==='string')&&
 !(%regexp_internal_match(/^[a-z]{2,3}$/,aJ)===null)){
@@ -5498,11 +3893,11 @@ return aJ;
 }
 var aK=(%_ToString(aJ));
 if(isStructuallyValidLanguageTag(aK)===false){
-throw %make_range_error(183,aK);
+throw %make_range_error(186,aK);
 }
 var aL=%CanonicalizeLanguageTag(aK);
 if(aL==='invalid-tag'){
-throw %make_range_error(183,aK);
+throw %make_range_error(186,aK);
 }
 return aL;
 }
@@ -5676,7 +4071,7 @@ return %InternalCompare(bn,(%_ToString(bp)),(%_ToString(bq)));
 AddBoundMethod(i,'compare',compare,2,'collator',false);
 function PluralRulesConstructor(){
 if((new.target===(void 0))){
-throw %make_type_error(39,"PluralRules");
+throw %make_type_error(40,"PluralRules");
 }
 var B=arguments[0];
 var C=arguments[1];
@@ -5714,7 +4109,7 @@ return br;
 %SetCode(j,PluralRulesConstructor);
 %DefineMethodsInternal(j.prototype,class{resolvedOptions(){
 if(!%IsInitializedIntlObjectOfType(this,'pluralrules')){
-throw %make_type_error(60,
+throw %make_type_error(61,
 'Intl.PluralRules.prototype.resolvedOptions',
 this);
 }
@@ -5742,7 +4137,7 @@ return supportedLocalesOf('pluralrules',B,arguments[1]);
 }},-1);
 %DefineMethodsInternal(j.prototype,class{select(ah){
 if(!%IsInitializedIntlObjectOfType(this,'pluralrules')){
-throw %make_type_error(60,
+throw %make_type_error(61,
 'Intl.PluralRules.prototype.select',
 this);
 }
@@ -5757,7 +4152,7 @@ if(!(ah===(void 0))){
 ah=(%_ToNumber(ah));
 if((%IS_VAR(ah)!==ah)
 ||ah<bt||ah>bu){
-throw %make_range_error(195,ad);
+throw %make_range_error(201,ad);
 }
 return %math_floor(ah);
 }
@@ -5798,10 +4193,10 @@ defineWEProperty(bh,'style',ac(
 'style','string',['decimal','percent','currency'],'decimal'));
 var bs=ac('currency','string');
 if(!(bs===(void 0))&&!isWellFormedCurrencyCode(bs)){
-throw %make_range_error(177,bs);
+throw %make_range_error(180,bs);
 }
 if(bh.style==='currency'&&(bs===(void 0))){
-throw %make_type_error(41);
+throw %make_type_error(42);
 }
 var bC,bD;
 var bE=ac(
@@ -6081,7 +4476,7 @@ year:{writable:true}
 var bT=%CreateDateTimeFormat(
 bm,{skeleton:bK,timeZone:bR},ai);
 if(ai.timeZone==="Etc/Unknown"){
-throw %make_range_error(201,bR);
+throw %make_range_error(207,bR);
 }
 %MarkAsInitializedIntlObjectOfType(bT,'dateformat');
 bT[u]=ai;
@@ -6135,13 +4530,13 @@ bY=(%_ToNumber(bX));
 return %InternalDateFormat(bI,bY);
 }
 %DefineMethodsInternal(g.prototype,class{formatToParts(bX){
-if((%IS_VAR(this)===null)||(this===(void 0)))throw %make_type_error(26,"Intl.DateTimeFormat.prototype.formatToParts");
+if((%IS_VAR(this)===null)||(this===(void 0)))throw %make_type_error(27,"Intl.DateTimeFormat.prototype.formatToParts");
 if(!(typeof(this)==='object')
 ){
-throw %make_type_error(25,this);
+throw %make_type_error(26,this);
 }
 if(!%IsInitializedIntlObjectOfType(this,'dateformat')){
-throw %make_type_error(60,
+throw %make_type_error(61,
 'Intl.DateTimeFormat.prototype.formatToParts',
 this);
 }
@@ -6166,7 +4561,7 @@ ca==='ETC/UTC'||ca==='ETC/GMT'){
 return'UTC';
 }
 var aE=%regexp_internal_match(GetTimezoneNameCheckRE(),bZ);
-if((aE===null))throw %make_range_error(169,bZ);
+if((aE===null))throw %make_range_error(172,bZ);
 var aF=toTitleCaseTimezoneLocation(aE[1])+'/'+
 toTitleCaseTimezoneLocation(aE[2]);
 if(!(aE[3]===(void 0))&&3<aE.length){
@@ -6203,7 +4598,7 @@ new.target,arguments);
 %SetCode(k,v8BreakIteratorConstructor);
 %DefineMethodsInternal(k.prototype,class{resolvedOptions(){
 if(!(new.target===(void 0))){
-throw %make_type_error(100);
+throw %make_type_error(103);
 }
 var cd=Unwrap(this,'breakiterator',k,
 'resolvedOptions',false);
@@ -6214,7 +4609,7 @@ type:cd[u].type
 }},-1);
 %DefineMethodsInternal(k,class{supportedLocalesOf(B){
 if(!(new.target===(void 0))){
-throw %make_type_error(100);
+throw %make_type_error(103);
 }
 return supportedLocalesOf('breakiterator',B,arguments[1]);
 }},-1);
@@ -6298,7 +4693,7 @@ return %StringLocaleConvertCase(ck,cl,be);
 }
 %DefineMethodsInternal(n.prototype,class{localeCompare(that){
 if((this==null)){
-throw %make_type_error(69);
+throw %make_type_error(72);
 }
 var B=arguments[1];
 var C=arguments[2];
@@ -6307,17 +4702,17 @@ return compare(bn,this,that);
 }},-1);
 %DefineMethodsInternal(n.prototype,class{
 toLocaleLowerCase(B){
-if((%IS_VAR(this)===null)||(this===(void 0)))throw %make_type_error(26,"String.prototype.toLocaleLowerCase");
+if((%IS_VAR(this)===null)||(this===(void 0)))throw %make_type_error(27,"String.prototype.toLocaleLowerCase");
 return LocaleConvertCase((%_ToString(this)),B,false);
 }
 toLocaleUpperCase(B){
-if((%IS_VAR(this)===null)||(this===(void 0)))throw %make_type_error(26,"String.prototype.toLocaleUpperCase");
+if((%IS_VAR(this)===null)||(this===(void 0)))throw %make_type_error(27,"String.prototype.toLocaleUpperCase");
 return LocaleConvertCase((%_ToString(this)),B,true);
 }
 },0);
 %DefineMethodsInternal(l.prototype,class{toLocaleString(){
 if(!(this instanceof l)&&typeof(this)!=='number'){
-throw %make_type_error(70,"Number");
+throw %make_type_error(73,"Number");
 }
 var B=arguments[0];
 var C=arguments[1];
@@ -6326,7 +4721,7 @@ return formatNumber(bG,this);
 }},-1);
 function toLocaleDateTime(cm,B,C,bO,bP,K){
 if(!(cm instanceof e)){
-throw %make_type_error(70,"Date");
+throw %make_type_error(73,"Date");
 }
 var bX=(%_ToNumber(cm));
 if((%IS_VAR(bX)!==bX)
@@ -6356,7 +4751,7 @@ this,B,C,'time','time','dateformattime');
 }},-1);
 })
 
- @CommonOperationsi>
+  @CommonOperations˝J
 (function(global, binding, v8) {
 'use strict';
 const _queue = v8.createPrivateSymbol('[[queue]]');
@@ -6425,10 +4820,7 @@ container[_queueTotalSize] = 0;
 function IsFiniteNonNegativeNumber(v) {
 return Number_isFinite(v) && v >= 0;
 }
-function ValidateAndNormalizeQueuingStrategy(size, highWaterMark) {
-if (size !== undefined && typeof size !== 'function') {
-throw new TypeError(binding.streamErrors.sizeNotAFunction);
-}
+function ValidateAndNormalizeHighWaterMark(highWaterMark) {
 highWaterMark = Number(highWaterMark);
 if (Number_isNaN(highWaterMark)) {
 throw new RangeError(binding.streamErrors.invalidHWM);
@@ -6436,19 +4828,55 @@ throw new RangeError(binding.streamErrors.invalidHWM);
 if (highWaterMark < 0) {
 throw new RangeError(binding.streamErrors.invalidHWM);
 }
-return {size, highWaterMark};
+return highWaterMark;
+}
+function MakeSizeAlgorithmFromSizeFunction(size) {
+if (size === undefined) {
+return () => 1;
+}
+if (typeof size !== 'function') {
+throw new TypeError(binding.streamErrors.sizeNotAFunction);
+}
+return size;
 }
 const callFunction = v8.uncurryThis(global.Function.prototype.call);
 const errTmplMustBeFunctionOrUndefined = name =>
 `${name} must be a function or undefined`;
-const Promise_resolve = v8.simpleBind(Promise.resolve, Promise);
-const Promise_reject = v8.simpleBind(Promise.reject, Promise);
+const Promise_resolve = Promise.resolve.bind(Promise);
+const Promise_reject = Promise.reject.bind(Promise);
+const Function_bind = v8.uncurryThis(global.Function.prototype.bind);
 function resolveMethod(O, P, nameForError) {
 const method = O[P];
 if (typeof method !== 'function' && typeof method !== 'undefined') {
 throw new TypeError(errTmplMustBeFunctionOrUndefined(nameForError));
 }
 return method;
+}
+function CreateAlgorithmFromUnderlyingMethod(
+underlyingObject, methodName, algoArgCount, methodNameForError) {
+const method =
+resolveMethod(underlyingObject, methodName, methodNameForError);
+if (method === undefined) {
+return () => Promise_resolve();
+}
+if (algoArgCount === 0) {
+return Function_bind(PromiseCall0, undefined, method, underlyingObject);
+}
+return Function_bind(PromiseCall1, undefined, method, underlyingObject);
+}
+function CreateAlgorithmFromUnderlyingMethodPassingController(
+underlyingObject, methodName, algoArgCount, controller,
+methodNameForError) {
+const method =
+resolveMethod(underlyingObject, methodName, methodNameForError);
+if (method === undefined) {
+return () => Promise_resolve();
+}
+if (algoArgCount === 0) {
+return Function_bind(
+PromiseCall1, undefined, method, underlyingObject, controller);
+}
+return arg => PromiseCall2(method, underlyingObject, arg, controller);
 }
 function CallOrNoop1(O, P, arg0, nameForError) {
 const method = resolveMethod(O, P, nameForError);
@@ -6457,31 +4885,23 @@ return undefined;
 }
 return callFunction(method, O, arg0);
 }
-function PromiseCallOrNoop0(O, P, nameForError) {
+function PromiseCall0(F, V) {
 try {
-const method = resolveMethod(O, P, nameForError);
-if (method === undefined) {
-return Promise_resolve();
-}
-return Promise_resolve(callFunction(method, O));
+return Promise_resolve(callFunction(F, V));
 } catch (e) {
 return Promise_reject(e);
 }
 }
-function PromiseCallOrNoop1(O, P, arg0, nameForError) {
+function PromiseCall1(F, V, arg0) {
 try {
-return Promise_resolve(CallOrNoop1(O, P, arg0, nameForError));
+return Promise_resolve(callFunction(F, V, arg0));
 } catch (e) {
 return Promise_reject(e);
 }
 }
-function PromiseCallOrNoop2(O, P, arg0, arg1, nameForError) {
+function PromiseCall2(F, V, arg0, arg1) {
 try {
-const method = resolveMethod(O, P, nameForError);
-if (method === undefined) {
-return Promise_resolve();
-}
-return Promise_resolve(callFunction(method, O, arg0, arg1));
+return Promise_resolve(callFunction(F, V, arg0, arg1));
 } catch (e) {
 return Promise_reject(e);
 }
@@ -6494,15 +4914,16 @@ rejectPromise,
 resolvePromise,
 markPromiseAsHandled,
 promiseState,
+CreateAlgorithmFromUnderlyingMethod,
+CreateAlgorithmFromUnderlyingMethodPassingController,
 DequeueValue,
 EnqueueValueWithSize,
 PeekQueueValue,
 ResetQueue,
-ValidateAndNormalizeQueuingStrategy,
+ValidateAndNormalizeHighWaterMark,
+MakeSizeAlgorithmFromSizeFunction,
 CallOrNoop1,
-PromiseCallOrNoop0,
-PromiseCallOrNoop1,
-PromiseCallOrNoop2
+PromiseCall2
 };
 });
 4CommonStrings˘
@@ -6670,7 +5091,7 @@ return 1;
 binding.createBuiltInCountQueuingStrategy = highWaterMark =>
 new BuiltInCountQueuingStrategy(highWaterMark);
 });
-8ReadableStream™∫
+8ReadableStream⁄–
 (function(global, binding, v8) {
 'use strict';
 const _reader = v8.createPrivateSymbol('[[reader]]');
@@ -6690,20 +5111,24 @@ const STATE_BITS_OFFSET = 1;
 const STATE_READABLE = 0;
 const STATE_CLOSED = 1;
 const STATE_ERRORED = 2;
-const _underlyingSource = v8.createPrivateSymbol('[[underlyingSource]]');
 const _controlledReadableStream =
 v8.createPrivateSymbol('[[controlledReadableStream]]');
-const _strategySize = v8.createPrivateSymbol('[[strategySize]]');
 const _strategyHWM = v8.createPrivateSymbol('[[strategyHWM]]');
 const _readableStreamDefaultControllerBits = v8.createPrivateSymbol(
 'bit field for [[started]], [[closeRequested]], [[pulling]], ' +
 '[[pullAgain]]');
+const _lockNotifyTarget = v8.createPrivateSymbol('[[lockNotifyTarget]]');
+const _strategySizeAlgorithm = v8.createPrivateSymbol(
+'[[strategySizeAlgorithm]]');
+const _pullAlgorithm = v8.createPrivateSymbol('[[pullAlgorithm]]');
+const _cancelAlgorithm = v8.createPrivateSymbol('[[cancelAlgorithm]]');
 const STARTED = 0b1;
 const CLOSE_REQUESTED = 0b10;
 const PULLING = 0b100;
 const PULL_AGAIN = 0b1000;
-const EXTERNALLY_CONTROLLED = 0b10000;
+const BLINK_LOCK_NOTIFICATIONS = 0b10000;
 const defineProperty = global.Object.defineProperty;
+const ObjectCreate = global.Object.create;
 const callFunction = v8.uncurryThis(global.Function.prototype.call);
 const applyFunction = v8.uncurryThis(global.Function.prototype.apply);
 const TypeError = global.TypeError;
@@ -6712,8 +5137,8 @@ const Boolean = global.Boolean;
 const String = global.String;
 const Promise = global.Promise;
 const thenPromise = v8.uncurryThis(Promise.prototype.then);
-const Promise_resolve = v8.simpleBind(Promise.resolve, Promise);
-const Promise_reject = v8.simpleBind(Promise.reject, Promise);
+const Promise_resolve = Promise.resolve.bind(Promise);
+const Promise_reject = Promise.reject.bind(Promise);
 const {
 _queue,
 _queueTotalSize,
@@ -6721,11 +5146,13 @@ hasOwnPropertyNoThrow,
 rejectPromise,
 resolvePromise,
 markPromiseAsHandled,
+CallOrNoop1,
+CreateAlgorithmFromUnderlyingMethod,
+CreateAlgorithmFromUnderlyingMethodPassingController,
 DequeueValue,
 EnqueueValueWithSize,
-ValidateAndNormalizeQueuingStrategy,
-CallOrNoop1,
-PromiseCallOrNoop1
+MakeSizeAlgorithmFromSizeFunction,
+ValidateAndNormalizeHighWaterMark,
 } = binding.streamOperations;
 const streamErrors = binding.streamErrors;
 const errCancelLockedStream =
@@ -6748,9 +5175,6 @@ const errEnqueueErroredStream =
 'Cannot enqueue a chunk into an errored readable stream';
 const errCloseClosedStream = 'Cannot close a closed readable stream';
 const errCloseErroredStream = 'Cannot close an errored readable stream';
-const errErrorClosedStream = 'Cannot error a close readable stream';
-const errErrorErroredStream =
-'Cannot error a readable stream that is already errored';
 const errGetReaderNotByteStream =
 'This readable stream does not support BYOB readers';
 const errGetReaderBadMode =
@@ -6775,24 +5199,35 @@ const errPipeThroughUndefinedWritable =
 const errPipeThroughUndefinedReadable =
 'Failed to execute \'pipeThrough\' on \'ReadableStream\': parameter ' +
 '1\'s \'readable\' property is undefined.';
+let useCounted = false;
 class ReadableStream {
-constructor(underlyingSource = {}, { size, highWaterMark = 1 } = {},
+constructor(underlyingSource = {}, strategy = {},
 internalArgument = undefined) {
-this[_readableStreamBits] = 0b0;
-ReadableStreamSetState(this, STATE_READABLE);
-this[_reader] = undefined;
-this[_storedError] = undefined;
-this[_controller] = undefined;
+const enableBlinkLockNotifications =
+internalArgument === createWithExternalControllerSentinel;
+if (!useCounted && !enableBlinkLockNotifications) {
+binding.countUse('ReadableStreamConstructor');
+useCounted = true;
+}
+InitializeReadableStream(this);
 const type = underlyingSource.type;
+const size = strategy.size;
+let highWaterMark = strategy.highWaterMark;
 const typeString = String(type);
 if (typeString === 'bytes') {
 throw new RangeError('bytes type is not yet implemented');
-} else if (type !== undefined) {
+}
+if (type !== undefined) {
 throw new RangeError(streamErrors.invalidType);
 }
-this[_controller] = new ReadableStreamDefaultController(
-this, underlyingSource, size, highWaterMark,
-internalArgument === createWithExternalControllerSentinel);
+if (highWaterMark === undefined) {
+highWaterMark = 1;
+}
+highWaterMark = ValidateAndNormalizeHighWaterMark(highWaterMark);
+const sizeAlgorithm = MakeSizeAlgorithmFromSizeFunction(size);
+SetUpReadableStreamDefaultControllerFromUnderlyingSource(
+this, underlyingSource, highWaterMark, sizeAlgorithm,
+enableBlinkLockNotifications);
 }
 get locked() {
 if (IsReadableStream(this) === false) {
@@ -6813,11 +5248,12 @@ getReader({mode} = {}) {
 if (IsReadableStream(this) === false) {
 throw new TypeError(streamErrors.illegalInvocation);
 }
-if (mode === 'byob') {
-throw new TypeError(errGetReaderNotByteStream);
-}
 if (mode === undefined) {
 return AcquireReadableStreamDefaultReader(this);
+}
+mode = String(mode);
+if (mode === 'byob') {
+throw new TypeError(errGetReaderNotByteStream);
 }
 throw new RangeError(errGetReaderBadMode);
 }
@@ -6860,6 +5296,7 @@ throw new TypeError(streamErrors.illegalInvocation);
 return ReadableStreamTee(this);
 }
 }
+const ReadableStream_prototype = ReadableStream.prototype;
 function ReadableStreamPipeTo(
 readable, dest, preventClose, preventAbort, preventCancel) {
 const reader = AcquireReadableStreamDefaultReader(readable);
@@ -7001,6 +5438,29 @@ return promise;
 function AcquireReadableStreamDefaultReader(stream) {
 return new ReadableStreamDefaultReader(stream);
 }
+function CreateReadableStream(startAlgorithm, pullAlgorithm, cancelAlgorithm,
+highWaterMark, sizeAlgorithm,
+enableBlinkLockNotifications) {
+if (highWaterMark === undefined) {
+highWaterMark = 1;
+}
+if (sizeAlgorithm === undefined) {
+sizeAlgorithm = () => 1;
+}
+const stream = ObjectCreate(ReadableStream_prototype);
+InitializeReadableStream(stream);
+const controller = ObjectCreate(ReadableStreamDefaultController_prototype);
+SetUpReadableStreamDefaultController(
+stream, controller, startAlgorithm, pullAlgorithm, cancelAlgorithm,
+highWaterMark, sizeAlgorithm, enableBlinkLockNotifications);
+return stream;
+}
+function InitializeReadableStream(stream) {
+stream[_readableStreamBits] = 0b0;
+ReadableStreamSetState(stream, STATE_READABLE);
+stream[_reader] = undefined;
+stream[_storedError] = undefined;
+}
 function IsReadableStream(x) {
 return hasOwnPropertyNoThrow(x, _controller);
 }
@@ -7017,65 +5477,66 @@ let canceled1 = false;
 let canceled2 = false;
 let reason1;
 let reason2;
-const promise = v8.createPromise();
-const branch1Stream = new ReadableStream({pull, cancel: cancel1});
-const branch2Stream = new ReadableStream({pull, cancel: cancel2});
-const branch1 = branch1Stream[_controller];
-const branch2 = branch2Stream[_controller];
-thenPromise(reader[_closedPromise], undefined, function(r) {
+const cancelPromise = v8.createPromise();
+function pullAlgorithm() {
+return thenPromise(
+ReadableStreamDefaultReaderRead(reader), ({value, done}) => {
+if (done && !closedOrErrored) {
+if (!canceled1) {
+ReadableStreamDefaultControllerClose(branch1controller);
+}
+if (!canceled2) {
+ReadableStreamDefaultControllerClose(branch2controller);
+}
+closedOrErrored = true;
+}
+if (closedOrErrored) {
+return;
+}
+if (!canceled1) {
+ReadableStreamDefaultControllerEnqueue(branch1controller, value);
+}
+if (!canceled2) {
+ReadableStreamDefaultControllerEnqueue(branch2controller, value);
+}
+});
+}
+function cancel1Algorithm(reason) {
+canceled1 = true;
+reason1 = reason;
+if (canceled2) {
+const cancelResult = ReadableStreamCancel(stream, [reason1, reason2]);
+resolvePromise(cancelPromise, cancelResult);
+}
+return cancelPromise;
+}
+function cancel2Algorithm(reason) {
+canceled2 = true;
+reason2 = reason;
+if (canceled1) {
+const cancelResult = ReadableStreamCancel(stream, [reason1, reason2]);
+resolvePromise(cancelPromise, cancelResult);
+}
+return cancelPromise;
+}
+const startAlgorithm = () => undefined;
+const branch1Stream = CreateReadableStream(
+startAlgorithm, pullAlgorithm, cancel1Algorithm, undefined, undefined,
+false);
+const branch2Stream = CreateReadableStream(
+startAlgorithm, pullAlgorithm, cancel2Algorithm, undefined, undefined,
+false);
+const branch1controller = branch1Stream[_controller];
+const branch2controller = branch2Stream[_controller];
+thenPromise(reader[_closedPromise], undefined, r => {
 if (closedOrErrored === true) {
 return;
 }
-ReadableStreamDefaultControllerError(branch1, r);
-ReadableStreamDefaultControllerError(branch2, r);
+ReadableStreamDefaultControllerError(branch1controller, r);
+ReadableStreamDefaultControllerError(branch2controller, r);
 closedOrErrored = true;
 });
 return [branch1Stream, branch2Stream];
-function pull() {
-return thenPromise(
-ReadableStreamDefaultReaderRead(reader), function(result) {
-const value = result.value;
-const done = result.done;
-if (done === true && closedOrErrored === false) {
-if (canceled1 === false) {
-ReadableStreamDefaultControllerClose(branch1);
-}
-if (canceled2 === false) {
-ReadableStreamDefaultControllerClose(branch2);
-}
-closedOrErrored = true;
-}
-if (closedOrErrored === true) {
-return;
-}
-if (canceled1 === false) {
-ReadableStreamDefaultControllerEnqueue(branch1, value);
-}
-if (canceled2 === false) {
-ReadableStreamDefaultControllerEnqueue(branch2, value);
-}
-});
-}
-function cancel1(reason) {
-canceled1 = true;
-reason1 = reason;
-if (canceled2 === true) {
-const compositeReason = [reason1, reason2];
-const cancelResult = ReadableStreamCancel(stream, compositeReason);
-resolvePromise(promise, cancelResult);
-}
-return promise;
-}
-function cancel2(reason) {
-canceled2 = true;
-reason2 = reason;
-if (canceled1 === true) {
-const compositeReason = [reason1, reason2];
-const cancelResult = ReadableStreamCancel(stream, compositeReason);
-resolvePromise(promise, cancelResult);
-}
-return promise;
-}
 }
 function ReadableStreamAddReadRequest(stream) {
 const promise = v8.createPromise();
@@ -7100,7 +5561,7 @@ function ReadableStreamClose(stream) {
 ReadableStreamSetState(stream, STATE_CLOSED);
 const reader = stream[_reader];
 if (reader === undefined) {
-return undefined;
+return;
 }
 if (IsReadableStreamDefaultReader(reader) === true) {
 reader[_readRequests].forEach(
@@ -7111,11 +5572,11 @@ reader[_readRequests] = new binding.SimpleQueue();
 resolvePromise(reader[_closedPromise], undefined);
 }
 function ReadableStreamError(stream, e) {
-stream[_storedError] = e;
 ReadableStreamSetState(stream, STATE_ERRORED);
+stream[_storedError] = e;
 const reader = stream[_reader];
 if (reader === undefined) {
-return undefined;
+return;
 }
 if (IsReadableStreamDefaultReader(reader) === true) {
 reader[_readRequests].forEach(request => rejectPromise(request, e));
@@ -7154,8 +5615,7 @@ cancel(reason) {
 if (IsReadableStreamDefaultReader(this) === false) {
 return Promise_reject(new TypeError(streamErrors.illegalInvocation));
 }
-const stream = this[_ownerReadableStream];
-if (stream === undefined) {
+if (this[_ownerReadableStream] === undefined) {
 return Promise_reject(new TypeError(errCancelReleasedReader));
 }
 return ReadableStreamReaderGenericCancel(this, reason);
@@ -7173,9 +5633,8 @@ releaseLock() {
 if (IsReadableStreamDefaultReader(this) === false) {
 throw new TypeError(streamErrors.illegalInvocation);
 }
-const stream = this[_ownerReadableStream];
-if (stream === undefined) {
-return undefined;
+if (this[_ownerReadableStream] === undefined) {
+return;
 }
 if (this[_readRequests].length > 0) {
 throw new TypeError(errReleaseReaderWithPendingRead);
@@ -7192,9 +5651,9 @@ return ReadableStreamCancel(reader[_ownerReadableStream], reason);
 function ReadableStreamReaderGenericInitialize(reader, stream) {
 const controller = stream[_controller];
 if (controller[_readableStreamDefaultControllerBits] &
-EXTERNALLY_CONTROLLED) {
-const underlyingSource = controller[_underlyingSource];
-callFunction(underlyingSource.notifyLockAcquired, underlyingSource);
+BLINK_LOCK_NOTIFICATIONS) {
+const lockNotifyTarget = controller[_lockNotifyTarget];
+callFunction(lockNotifyTarget.notifyLockAcquired, lockNotifyTarget);
 }
 reader[_ownerReadableStream] = stream;
 stream[_reader] = reader;
@@ -7214,9 +5673,9 @@ break;
 function ReadableStreamReaderGenericRelease(reader) {
 const controller = reader[_ownerReadableStream][_controller];
 if (controller[_readableStreamDefaultControllerBits] &
-EXTERNALLY_CONTROLLED) {
-const underlyingSource = controller[_underlyingSource];
-callFunction(underlyingSource.notifyLockReleased, underlyingSource);
+BLINK_LOCK_NOTIFICATIONS) {
+const lockNotifyTarget = controller[_lockNotifyTarget];
+callFunction(lockNotifyTarget.notifyLockReleased, lockNotifyTarget);
 }
 if (ReadableStreamGetState(reader[_ownerReadableStream]) ===
 STATE_READABLE) {
@@ -7234,49 +5693,18 @@ reader[_ownerReadableStream] = undefined;
 function ReadableStreamDefaultReaderRead(reader) {
 const stream = reader[_ownerReadableStream];
 stream[_readableStreamBits] |= DISTURBED;
-if (ReadableStreamGetState(stream) === STATE_CLOSED) {
+switch (ReadableStreamGetState(stream)) {
+case STATE_CLOSED:
 return Promise_resolve(CreateIterResultObject(undefined, true));
-}
-if (ReadableStreamGetState(stream) === STATE_ERRORED) {
+case STATE_ERRORED:
 return Promise_reject(stream[_storedError]);
-}
+default:
 return ReadableStreamDefaultControllerPull(stream[_controller]);
 }
+}
 class ReadableStreamDefaultController {
-constructor(
-stream, underlyingSource, size, highWaterMark, isExternallyControlled) {
-if (IsReadableStream(stream) === false) {
+constructor() {
 throw new TypeError(streamErrors.illegalConstructor);
-}
-if (stream[_controller] !== undefined) {
-throw new TypeError(streamErrors.illegalConstructor);
-}
-this[_controlledReadableStream] = stream;
-this[_underlyingSource] = underlyingSource;
-this[_queue] = new binding.SimpleQueue();
-this[_queueTotalSize] = 0;
-this[_readableStreamDefaultControllerBits] = 0b0;
-if (isExternallyControlled === true) {
-this[_readableStreamDefaultControllerBits] |= EXTERNALLY_CONTROLLED;
-}
-const normalizedStrategy =
-ValidateAndNormalizeQueuingStrategy(size, highWaterMark);
-this[_strategySize] = normalizedStrategy.size;
-this[_strategyHWM] = normalizedStrategy.highWaterMark;
-const controller = this;
-const startResult = CallOrNoop1(
-underlyingSource, 'start', this, 'underlyingSource.start');
-thenPromise(
-Promise_resolve(startResult),
-() => {
-controller[_readableStreamDefaultControllerBits] |= STARTED;
-ReadableStreamDefaultControllerCallPullIfNeeded(controller);
-},
-r => {
-if (ReadableStreamGetState(stream) === STATE_READABLE) {
-ReadableStreamDefaultControllerError(controller, r);
-}
-});
 }
 get desiredSize() {
 if (IsReadableStreamDefaultController(this) === false) {
@@ -7288,16 +5716,22 @@ close() {
 if (IsReadableStreamDefaultController(this) === false) {
 throw new TypeError(streamErrors.illegalInvocation);
 }
-const stream = this[_controlledReadableStream];
+if (ReadableStreamDefaultControllerCanCloseOrEnqueue(this) === false) {
+let errorDescription;
 if (this[_readableStreamDefaultControllerBits] & CLOSE_REQUESTED) {
-throw new TypeError(errCloseCloseRequestedStream);
+errorDescription = errCloseCloseRequestedStream;
+} else {
+const stream = this[_controlledReadableStream];
+switch (ReadableStreamGetState(stream)) {
+case STATE_ERRORED:
+errorDescription = errCloseErroredStream;
+break;
+case STATE_CLOSED:
+errorDescription = errCloseClosedStream;
+break;
 }
-const state = ReadableStreamGetState(stream);
-if (state === STATE_ERRORED) {
-throw new TypeError(errCloseErroredStream);
 }
-if (state === STATE_CLOSED) {
-throw new TypeError(errCloseClosedStream);
+throw new TypeError(errorDescription);
 }
 return ReadableStreamDefaultControllerClose(this);
 }
@@ -7315,22 +5749,14 @@ error(e) {
 if (IsReadableStreamDefaultController(this) === false) {
 throw new TypeError(streamErrors.illegalInvocation);
 }
-const stream = this[_controlledReadableStream];
-const state = ReadableStreamGetState(stream);
-if (state === STATE_ERRORED) {
-throw new TypeError(errErrorErroredStream);
-}
-if (state === STATE_CLOSED) {
-throw new TypeError(errErrorClosedStream);
-}
 return ReadableStreamDefaultControllerError(this, e);
 }
 }
+const ReadableStreamDefaultController_prototype =
+ReadableStreamDefaultController.prototype;
 function ReadableStreamDefaultControllerCancel(controller, reason) {
 controller[_queue] = new binding.SimpleQueue();
-const underlyingSource = controller[_underlyingSource];
-return PromiseCallOrNoop1(
-underlyingSource, 'cancel', reason, 'underlyingSource.cancel');
+return controller[_cancelAlgorithm](reason);
 }
 function ReadableStreamDefaultControllerPull(controller) {
 const stream = controller[_controlledReadableStream];
@@ -7356,18 +5782,15 @@ function ReadableStreamDefaultControllerCallPullIfNeeded(controller) {
 const shouldPull =
 ReadableStreamDefaultControllerShouldCallPull(controller);
 if (shouldPull === false) {
-return undefined;
+return;
 }
 if (controller[_readableStreamDefaultControllerBits] & PULLING) {
 controller[_readableStreamDefaultControllerBits] |= PULL_AGAIN;
-return undefined;
+return;
 }
 controller[_readableStreamDefaultControllerBits] |= PULLING;
-const underlyingSource = controller[_underlyingSource];
-const pullPromise = PromiseCallOrNoop1(
-underlyingSource, 'pull', controller, 'underlyingSource.pull');
 thenPromise(
-pullPromise,
+controller[_pullAlgorithm](),
 () => {
 controller[_readableStreamDefaultControllerBits] &= ~PULLING;
 if (controller[_readableStreamDefaultControllerBits] & PULL_AGAIN) {
@@ -7376,40 +5799,29 @@ ReadableStreamDefaultControllerCallPullIfNeeded(controller);
 }
 },
 e => {
-if (ReadableStreamGetState(controller[_controlledReadableStream]) ===
-STATE_READABLE) {
 ReadableStreamDefaultControllerError(controller, e);
-}
 });
 }
 function ReadableStreamDefaultControllerShouldCallPull(controller) {
-const stream = controller[_controlledReadableStream];
-const state = ReadableStreamGetState(stream);
-if (state === STATE_CLOSED || state === STATE_ERRORED) {
-return false;
-}
-if (controller[_readableStreamDefaultControllerBits] & CLOSE_REQUESTED) {
+if (!ReadableStreamDefaultControllerCanCloseOrEnqueue(controller)) {
 return false;
 }
 if (!(controller[_readableStreamDefaultControllerBits] & STARTED)) {
 return false;
 }
+const stream = controller[_controlledReadableStream];
 if (IsReadableStreamLocked(stream) === true &&
 ReadableStreamGetNumReadRequests(stream) > 0) {
 return true;
 }
 const desiredSize =
 ReadableStreamDefaultControllerGetDesiredSize(controller);
-if (desiredSize > 0) {
-return true;
-}
-return false;
+return desiredSize > 0;
 }
 function ReadableStreamDefaultControllerClose(controller) {
-const stream = controller[_controlledReadableStream];
 controller[_readableStreamDefaultControllerBits] |= CLOSE_REQUESTED;
 if (controller[_queue].length === 0) {
-ReadableStreamClose(stream);
+ReadableStreamClose(controller[_controlledReadableStream]);
 }
 }
 function ReadableStreamDefaultControllerEnqueue(controller, chunk) {
@@ -7418,36 +5830,40 @@ if (IsReadableStreamLocked(stream) === true &&
 ReadableStreamGetNumReadRequests(stream) > 0) {
 ReadableStreamFulfillReadRequest(stream, chunk, false);
 } else {
-let chunkSize = 1;
-const strategySize = controller[_strategySize];
-if (strategySize !== undefined) {
+let chunkSize;
 try {
-chunkSize = strategySize(chunk);
+chunkSize = callFunction(controller[_strategySizeAlgorithm], undefined,
+chunk);
 } catch (chunkSizeE) {
-if (ReadableStreamGetState(stream) === STATE_READABLE) {
 ReadableStreamDefaultControllerError(controller, chunkSizeE);
-}
 throw chunkSizeE;
-}
 }
 try {
 EnqueueValueWithSize(controller, chunk, chunkSize);
 } catch (enqueueE) {
-if (ReadableStreamGetState(stream) === STATE_READABLE) {
 ReadableStreamDefaultControllerError(controller, enqueueE);
-}
 throw enqueueE;
 }
 }
 ReadableStreamDefaultControllerCallPullIfNeeded(controller);
 }
 function ReadableStreamDefaultControllerError(controller, e) {
-controller[_queue] = new binding.SimpleQueue();
 const stream = controller[_controlledReadableStream];
+if (ReadableStreamGetState(stream) !== STATE_READABLE) {
+return;
+}
+controller[_queue] = new binding.SimpleQueue();
 ReadableStreamError(stream, e);
 }
 function ReadableStreamDefaultControllerGetDesiredSize(controller) {
+switch (ReadableStreamGetState(controller[_controlledReadableStream])) {
+case STATE_ERRORED:
+return null;
+case STATE_CLOSED:
+return 0;
+default:
 return controller[_strategyHWM] - controller[_queueTotalSize];
+}
 }
 function ReadableStreamDefaultControllerHasBackpressure(controller) {
 return !ReadableStreamDefaultControllerShouldCallPull(controller);
@@ -7458,6 +5874,42 @@ return false;
 }
 const state = ReadableStreamGetState(controller[_controlledReadableStream]);
 return state === STATE_READABLE;
+}
+function SetUpReadableStreamDefaultController(
+stream, controller, startAlgorithm, pullAlgorithm, cancelAlgorithm,
+highWaterMark, sizeAlgorithm, enableBlinkLockNotifications) {
+controller[_controlledReadableStream] = stream;
+controller[_queue] = new binding.SimpleQueue();
+controller[_queueTotalSize] = 0;
+controller[_readableStreamDefaultControllerBits] =
+enableBlinkLockNotifications ? BLINK_LOCK_NOTIFICATIONS : 0b0;
+controller[_strategySizeAlgorithm] = sizeAlgorithm;
+controller[_strategyHWM] = highWaterMark;
+controller[_pullAlgorithm] = pullAlgorithm;
+controller[_cancelAlgorithm] = cancelAlgorithm;
+stream[_controller] = controller;
+thenPromise(Promise_resolve(startAlgorithm()), () => {
+controller[_readableStreamDefaultControllerBits] |= STARTED;
+ReadableStreamDefaultControllerCallPullIfNeeded(controller);
+}, r =>  ReadableStreamDefaultControllerError(controller, r));
+}
+function SetUpReadableStreamDefaultControllerFromUnderlyingSource(
+stream, underlyingSource, highWaterMark, sizeAlgorithm,
+enableBlinkLockNotifications) {
+const controller = ObjectCreate(ReadableStreamDefaultController_prototype);
+const startAlgorithm =
+() => CallOrNoop1(underlyingSource, 'start', controller,
+'underlyingSource.start');
+const pullAlgorithm = CreateAlgorithmFromUnderlyingMethodPassingController(
+underlyingSource, 'pull', 0, controller, 'underlyingSource.pull');
+const cancelAlgorithm = CreateAlgorithmFromUnderlyingMethod(
+underlyingSource, 'cancel', 1, 'underlyingSource.cancel');
+if (enableBlinkLockNotifications) {
+controller[_lockNotifyTarget] = underlyingSource;
+}
+SetUpReadableStreamDefaultController(
+stream, controller, startAlgorithm, pullAlgorithm, cancelAlgorithm,
+highWaterMark, sizeAlgorithm, enableBlinkLockNotifications);
 }
 function ReadableStreamGetState(stream) {
 return (stream[_readableStreamBits] & STATE_MASK) >> STATE_BITS_OFFSET;
@@ -7524,7 +5976,7 @@ binding.createReadableStreamWithExternalController =
 return new ReadableStream(
 underlyingSource, strategy, createWithExternalControllerSentinel);
 };
-binding.ReadableStream = ReadableStream;
+binding.CreateReadableStream = CreateReadableStream;
 binding.ReadableStreamDefaultControllerCanCloseOrEnqueue =
 ReadableStreamDefaultControllerCanCloseOrEnqueue;
 binding.ReadableStreamDefaultControllerHasBackpressure =
@@ -7533,9 +5985,11 @@ binding.getReadableStreamEnqueueError = getReadableStreamEnqueueError;
 binding.getReadableStreamController = getReadableStreamController;
 binding.getReadableStreamStoredError = getReadableStreamStoredError;
 });
-8WritableStream˙á
+8WritableStream*¢
 (function(global, binding, v8) {
 'use strict';
+const _abortAlgorithm = v8.createPrivateSymbol('[[abortAlgorithm]]');
+const _closeAlgorithm = v8.createPrivateSymbol('[[closeAlgorithm]]');
 const _closeRequest = v8.createPrivateSymbol('[[closeRequest]]');
 const _inFlightWriteRequest =
 v8.createPrivateSymbol('[[inFlightWriteRequest]]');
@@ -7557,8 +6011,9 @@ const _controlledWritableStream =
 v8.createPrivateSymbol('[[controlledWritableStream]]');
 const _started = v8.createPrivateSymbol('[[started]]');
 const _strategyHWM = v8.createPrivateSymbol('[[strategyHWM]]');
-const _strategySize = v8.createPrivateSymbol('[[strategySize]]');
-const _underlyingSink = v8.createPrivateSymbol('[[underlyingSink]]');
+const _strategySizeAlgorithm =
+v8.createPrivateSymbol('[[strategySizeAlgorithm]]');
+const _writeAlgorithm = v8.createPrivateSymbol('[[writeAlgorithm]]');
 const WRITABLE = 0;
 const CLOSED = 1;
 const ERRORING = 2;
@@ -7566,14 +6021,15 @@ const ERRORED = 3;
 const STATE_MASK = 0xF;
 const BACKPRESSURE_FLAG = 0x10;
 const defineProperty = global.Object.defineProperty;
+const ObjectCreate = global.Object.create;
 const Function_call = v8.uncurryThis(global.Function.prototype.call);
 const TypeError = global.TypeError;
 const RangeError = global.RangeError;
 const Boolean = global.Boolean;
 const Promise = global.Promise;
 const thenPromise = v8.uncurryThis(Promise.prototype.then);
-const Promise_resolve = v8.simpleBind(Promise.resolve, Promise);
-const Promise_reject = v8.simpleBind(Promise.reject, Promise);
+const Promise_resolve = Promise.resolve.bind(Promise);
+const Promise_reject = Promise.reject.bind(Promise);
 const {
 _queue,
 _queueTotalSize,
@@ -7582,20 +6038,19 @@ rejectPromise,
 resolvePromise,
 markPromiseAsHandled,
 promiseState,
+CreateAlgorithmFromUnderlyingMethod,
+CreateAlgorithmFromUnderlyingMethodPassingController,
 DequeueValue,
 EnqueueValueWithSize,
+MakeSizeAlgorithmFromSizeFunction,
 PeekQueueValue,
 ResetQueue,
-ValidateAndNormalizeQueuingStrategy,
+ValidateAndNormalizeHighWaterMark,
 CallOrNoop1,
-PromiseCallOrNoop0,
-PromiseCallOrNoop1,
-PromiseCallOrNoop2
 } = binding.streamOperations;
 const streamErrors = binding.streamErrors;
 const errAbortLockedStream =
 'Cannot abort a writable stream that is locked to a writer';
-const errStreamAborting = 'The stream is in the process of being aborted';
 const errWriterLockReleasedPrefix =
 'This writable stream writer has been released and cannot be ';
 const errCloseCloseRequestedStream = 'Cannot close a writable stream that ' +
@@ -7608,6 +6063,7 @@ const verbUsedToGetTheDesiredSize = 'used to get the desiredSize';
 const verbAborted = 'aborted';
 const verbClosed = 'closed';
 const verbWrittenTo = 'written to';
+let useCounted = false;
 function createWriterLockReleasedError(verb) {
 return new TypeError(errWriterLockReleasedPrefix + verb);
 }
@@ -7623,24 +6079,25 @@ function rejectPromises(queue, e) {
 queue.forEach(promise => rejectPromise(promise, e));
 }
 class WritableStream {
-constructor(underlyingSink = {}, {size, highWaterMark = 1} = {}) {
-this[_stateAndFlags] = WRITABLE;
-this[_storedError] = undefined;
-this[_writer] = undefined;
-this[_writableStreamController] = undefined;
-this[_inFlightWriteRequest] = undefined;
-this[_closeRequest] = undefined;
-this[_inFlightCloseRequest] = undefined;
-this[_pendingAbortRequest] = undefined;
-this[_writeRequests] = new binding.SimpleQueue();
+constructor(underlyingSink = {}, strategy = {}) {
+if (!useCounted) {
+binding.countUse('WritableStreamConstructor');
+useCounted = true;
+}
+InitializeWritableStream(this);
 const type = underlyingSink.type;
+const size = strategy.size;
+let highWaterMark = strategy.highWaterMark;
 if (type !== undefined) {
 throw new RangeError(streamErrors.invalidType);
 }
-this[_writableStreamController] = new WritableStreamDefaultController(
-this, underlyingSink, size, highWaterMark);
-WritableStreamDefaultControllerStartSteps(
-this[_writableStreamController]);
+const sizeAlgorithm = MakeSizeAlgorithmFromSizeFunction(size);
+if (highWaterMark === undefined) {
+highWaterMark = 1;
+}
+highWaterMark = ValidateAndNormalizeHighWaterMark(highWaterMark);
+SetUpWritableStreamDefaultControllerFromUnderlyingSink(
+this, underlyingSink, highWaterMark, sizeAlgorithm);
 }
 get locked() {
 if (!IsWritableStream(this)) {
@@ -7664,8 +6121,37 @@ throw new TypeError(streamErrors.illegalInvocation);
 return AcquireWritableStreamDefaultWriter(this);
 }
 }
+const WritableStream_prototype = WritableStream.prototype;
 function AcquireWritableStreamDefaultWriter(stream) {
 return new WritableStreamDefaultWriter(stream);
+}
+function CreateWritableStream(
+startAlgorithm, writeAlgorithm, closeAlgorithm, abortAlgorithm,
+highWaterMark, sizeAlgorithm) {
+if (highWaterMark === undefined) {
+highWaterMark = 1;
+}
+if (sizeAlgorithm === undefined) {
+sizeAlgorithm = () => 1;
+}
+const stream = ObjectCreate(WritableStream_prototype);
+InitializeWritableStream(stream);
+const controller = ObjectCreate(WritableStreamDefaultController_prototype);
+SetUpWritableStreamDefaultController(
+stream, controller, startAlgorithm, writeAlgorithm, closeAlgorithm,
+abortAlgorithm, highWaterMark, sizeAlgorithm);
+return stream;
+}
+function InitializeWritableStream(stream) {
+stream[_stateAndFlags] = WRITABLE;
+stream[_storedError] = undefined;
+stream[_writer] = undefined;
+stream[_writableStreamController] = undefined;
+stream[_inFlightWriteRequest] = undefined;
+stream[_closeRequest] = undefined;
+stream[_inFlightCloseRequest] = undefined;
+stream[_pendingAbortRequest] = undefined;
+stream[_writeRequests] = new binding.SimpleQueue();
 }
 function IsWritableStream(x) {
 return hasOwnPropertyNoThrow(x, _writableStreamController);
@@ -7675,15 +6161,11 @@ return stream[_writer] !== undefined;
 }
 function WritableStreamAbort(stream, reason) {
 const state = stream[_stateAndFlags] & STATE_MASK;
-if (state === CLOSED) {
+if (state === CLOSED || state === ERRORED) {
 return Promise_resolve(undefined);
 }
-if (state === ERRORED) {
-return Promise_reject(stream[_storedError]);
-}
-const error = new TypeError(errStreamAborting);
 if (stream[_pendingAbortRequest] !== undefined) {
-return Promise_reject(error);
+return stream[_pendingAbortRequest].promise;
 }
 const wasAlreadyErroring = state === ERRORING;
 if (wasAlreadyErroring) {
@@ -7692,7 +6174,7 @@ reason = undefined;
 const promise = v8.createPromise();
 stream[_pendingAbortRequest] = {promise, reason, wasAlreadyErroring};
 if (!wasAlreadyErroring) {
-WritableStreamStartErroring(stream, error);
+WritableStreamStartErroring(stream, reason);
 }
 return promise;
 }
@@ -8063,25 +6545,8 @@ function getWritableStreamDefaultWriterReadyPromise(writer) {
 return writer[_readyPromise];
 }
 class WritableStreamDefaultController {
-constructor(stream, underlyingSink, size, highWaterMark) {
-if (!IsWritableStream(stream)) {
+constructor() {
 throw new TypeError(streamErrors.illegalConstructor);
-}
-if (stream[_writableStreamController] !== undefined) {
-throw new TypeError(streamErrors.illegalConstructor);
-}
-this[_controlledWritableStream] = stream;
-this[_underlyingSink] = underlyingSink;
-this[_queue] = undefined;
-this[_queueTotalSize] = undefined;
-ResetQueue(this);
-this[_started] = false;
-const normalizedStrategy =
-ValidateAndNormalizeQueuingStrategy(size, highWaterMark);
-this[_strategySize] = normalizedStrategy.size;
-this[_strategyHWM] = normalizedStrategy.highWaterMark;
-const backpressure = WritableStreamDefaultControllerGetBackpressure(this);
-WritableStreamUpdateBackpressure(stream, backpressure);
 }
 error(e) {
 if (!IsWritableStreamDefaultController(this)) {
@@ -8095,17 +6560,35 @@ return;
 WritableStreamDefaultControllerError(this, e);
 }
 }
+const WritableStreamDefaultController_prototype =
+WritableStreamDefaultController.prototype;
 function WritableStreamDefaultControllerAbortSteps(controller, reason) {
-return PromiseCallOrNoop1(controller[_underlyingSink], 'abort', reason,
-'underlyingSink.abort');
+return controller[_abortAlgorithm](reason);
 }
 function WritableStreamDefaultControllerErrorSteps(controller) {
 ResetQueue(controller);
 }
-function WritableStreamDefaultControllerStartSteps(controller) {
-const startResult = CallOrNoop1(controller[_underlyingSink], 'start',
-controller, 'underlyingSink.start');
-const stream = controller[_controlledWritableStream];
+function IsWritableStreamDefaultController(x) {
+return hasOwnPropertyNoThrow(x, _controlledWritableStream);
+}
+function SetUpWritableStreamDefaultController(
+stream, controller, startAlgorithm, writeAlgorithm, closeAlgorithm,
+abortAlgorithm, highWaterMark, sizeAlgorithm) {
+controller[_controlledWritableStream] = stream;
+stream[_writableStreamController] = controller;
+controller[_queue] = undefined;
+controller[_queueTotalSize] = undefined;
+ResetQueue(controller);
+controller[_started] = false;
+controller[_strategySizeAlgorithm] = sizeAlgorithm;
+controller[_strategyHWM] = highWaterMark;
+controller[_writeAlgorithm] = writeAlgorithm;
+controller[_closeAlgorithm] = closeAlgorithm;
+controller[_abortAlgorithm] = abortAlgorithm;
+const backpressure =
+WritableStreamDefaultControllerGetBackpressure(controller);
+WritableStreamUpdateBackpressure(stream, backpressure);
+const startResult = startAlgorithm();
 const startPromise = Promise_resolve(startResult);
 thenPromise(
 startPromise,
@@ -8118,26 +6601,34 @@ controller[_started] = true;
 WritableStreamDealWithRejection(stream, r);
 });
 }
-function IsWritableStreamDefaultController(x) {
-return hasOwnPropertyNoThrow(x, _underlyingSink);
+function SetUpWritableStreamDefaultControllerFromUnderlyingSink(
+stream, underlyingSink, highWaterMark, sizeAlgorithm) {
+const controller = ObjectCreate(WritableStreamDefaultController_prototype);
+const startAlgorithm =
+() => CallOrNoop1(underlyingSink, 'start', controller,
+'underlyingSink.start');
+const writeAlgorithm = CreateAlgorithmFromUnderlyingMethodPassingController(
+underlyingSink, 'write', 1, controller, 'underlyingSink.write');
+const closeAlgorithm = CreateAlgorithmFromUnderlyingMethod(
+underlyingSink, 'close', 0, 'underlyingSink.close');
+const abortAlgorithm = CreateAlgorithmFromUnderlyingMethod(
+underlyingSink, 'abort', 1, 'underlyingSink.abort');
+SetUpWritableStreamDefaultController(stream, controller, startAlgorithm,
+writeAlgorithm, closeAlgorithm, abortAlgorithm, highWaterMark,
+sizeAlgorithm);
 }
 function WritableStreamDefaultControllerClose(controller) {
 EnqueueValueWithSize(controller, 'close', 0);
 WritableStreamDefaultControllerAdvanceQueueIfNeeded(controller);
 }
 function WritableStreamDefaultControllerGetChunkSize(controller, chunk) {
-const strategySize = controller[_strategySize];
-if (strategySize === undefined) {
-return 1;
-}
-let value;
 try {
-value = Function_call(strategySize, undefined, chunk);
+return Function_call(controller[_strategySizeAlgorithm], undefined,
+chunk);
 } catch (e) {
 WritableStreamDefaultControllerErrorIfNeeded(controller, e);
 return 1;
 }
-return value;
 }
 function WritableStreamDefaultControllerGetDesiredSize(controller) {
 return controller[_strategyHWM] - controller[_queueTotalSize];
@@ -8197,9 +6688,7 @@ function WritableStreamDefaultControllerProcessClose(controller) {
 const stream = controller[_controlledWritableStream];
 WritableStreamMarkCloseRequestInFlight(stream);
 DequeueValue(controller);
-const sinkClosePromise =
-PromiseCallOrNoop0(controller[_underlyingSink], 'close',
-'underlyingSink.close');
+const sinkClosePromise = controller[_closeAlgorithm]();
 thenPromise(
 sinkClosePromise, () => WritableStreamFinishInFlightClose(stream),
 reason => WritableStreamFinishInFlightCloseWithError(stream, reason));
@@ -8207,9 +6696,7 @@ reason => WritableStreamFinishInFlightCloseWithError(stream, reason));
 function WritableStreamDefaultControllerProcessWrite(controller, chunk) {
 const stream = controller[_controlledWritableStream];
 WritableStreamMarkFirstWriteRequestInFlight(stream);
-const sinkWritePromise = PromiseCallOrNoop2(
-controller[_underlyingSink], 'write', chunk, controller,
-'underlyingSink.write');
+const sinkWritePromise = controller[_writeAlgorithm](chunk);
 thenPromise(
 sinkWritePromise,
 () => {
@@ -8262,6 +6749,7 @@ binding.WritableStreamDefaultWriterRelease =
 WritableStreamDefaultWriterRelease;
 binding.WritableStreamDefaultWriterWrite = WritableStreamDefaultWriterWrite;
 binding.getWritableStreamStoredError = getWritableStreamStoredError;
+binding.CreateWritableStream = CreateWritableStream;
 binding.WritableStream = WritableStream;
 binding.WritableStreamDefaultControllerErrorIfNeeded =
 WritableStreamDefaultControllerErrorIfNeeded;
@@ -8269,45 +6757,47 @@ binding.isWritableStreamWritable = isWritableStreamWritable;
 binding.isWritableStreamErroring = isWritableStreamErroring;
 binding.getWritableStreamController = getWritableStreamController;
 });
- <TransformStreamî
+<TransformStreamuπ
 (function(global, binding, v8) {
 'use strict';
 const _backpressure = v8.createPrivateSymbol('[[backpressure]]');
 const _backpressureChangePromise =
 v8.createPrivateSymbol('[[backpressureChangePromise]]');
 const _readable = v8.createPrivateSymbol('[[readable]]');
-const _transformer = v8.createPrivateSymbol('[[transformer]]');
 const _transformStreamController =
 v8.createPrivateSymbol('[[transformStreamController]]');
 const _writable = v8.createPrivateSymbol('[[writable]]');
 const _controlledTransformStream =
 v8.createPrivateSymbol('[[controlledTransformStream]]');
-const _ownerTransformStream =
-v8.createPrivateSymbol('[[ownerTransformStream]]');
-const _startPromise = v8.createPrivateSymbol('[[startPromise]]');
+const _flushAlgorithm = v8.createPrivateSymbol('[[flushAlgorithm]]');
+const _transformAlgorithm = v8.createPrivateSymbol('[[transformAlgorithm]]');
 const defineProperty = global.Object.defineProperty;
-const Function_call = v8.uncurryThis(global.Function.prototype.call);
+const ObjectCreate = global.Object.create;
 const TypeError = global.TypeError;
 const RangeError = global.RangeError;
 const Promise = global.Promise;
 const thenPromise = v8.uncurryThis(Promise.prototype.then);
-const Promise_resolve = v8.simpleBind(Promise.resolve, Promise);
-const Promise_reject = v8.simpleBind(Promise.reject, Promise);
+const Promise_resolve = Promise.resolve.bind(Promise);
+const Promise_reject = Promise.reject.bind(Promise);
 const {
 hasOwnPropertyNoThrow,
 resolvePromise,
+CreateAlgorithmFromUnderlyingMethodPassingController,
 CallOrNoop1,
-PromiseCallOrNoop1
+MakeSizeAlgorithmFromSizeFunction,
+PromiseCall2,
+ValidateAndNormalizeHighWaterMark
 } = binding.streamOperations;
 const streamErrors = binding.streamErrors;
-const errWritableStreamAborted = 'The writable stream has been aborted';
 const errStreamTerminated = 'The transform stream has been terminated';
-const templateErrorIsNotAFunction = f => `${f} is not a function`;
+let useCounted = false;
 class TransformStream {
-constructor(
-transformer = {}, writableStrategy = undefined,
-{size, highWaterMark = 0} = {}) {
-this[_transformer] = transformer;
+constructor(transformer = {},
+writableStrategy = {}, readableStrategy = {}) {
+if (!useCounted) {
+binding.countUse('TransformStreamConstructor');
+useCounted = true;
+}
 const readableType = transformer.readableType;
 if (readableType !== undefined) {
 throw new RangeError(streamErrors.invalidType);
@@ -8316,17 +6806,31 @@ const writableType = transformer.writableType;
 if (writableType !== undefined) {
 throw new RangeError(streamErrors.invalidType);
 }
-this[_transformStreamController] = undefined;
-const controller = new TransformStreamDefaultController(this);
-this[_transformStreamController] = controller;
+const writableSizeFunction = writableStrategy.size;
+const writableSizeAlgorithm =
+MakeSizeAlgorithmFromSizeFunction(writableSizeFunction);
+let writableHighWaterMark = writableStrategy.highWaterMark;
+if (writableHighWaterMark === undefined) {
+writableHighWaterMark = 1;
+}
+writableHighWaterMark =
+ValidateAndNormalizeHighWaterMark(writableHighWaterMark);
+const readableSizeFunction = readableStrategy.size;
+const readableSizeAlgorithm =
+MakeSizeAlgorithmFromSizeFunction(readableSizeFunction);
+let readableHighWaterMark = readableStrategy.highWaterMark;
+if (readableHighWaterMark === undefined) {
+readableHighWaterMark = 0;
+}
+readableHighWaterMark =
+ValidateAndNormalizeHighWaterMark(readableHighWaterMark);
 const startPromise = v8.createPromise();
-const source = new TransformStreamDefaultSource(this, startPromise);
-const readableStrategy = {size, highWaterMark};
-this[_readable] = new binding.ReadableStream(source, readableStrategy);
-const sink = new TransformStreamDefaultSink(this, startPromise);
-this[_writable] = new binding.WritableStream(sink, writableStrategy);
-TransformStreamSetBackpressure(this, true);
-const startResult = CallOrNoop1(transformer, 'start', controller,
+InitializeTransformStream(
+this, startPromise, writableHighWaterMark, writableSizeAlgorithm,
+readableHighWaterMark, readableSizeAlgorithm);
+SetUpTransformStreamDefaultControllerFromTransformer(this, transformer);
+const startResult = CallOrNoop1(
+transformer, 'start', this[_transformStreamController],
 'transformer.start');
 resolvePromise(startPromise, startResult);
 }
@@ -8342,6 +6846,61 @@ throw new TypeError(streamErrors.illegalInvocation);
 }
 return this[_writable];
 }
+}
+const TransformStream_prototype = TransformStream.prototype;
+function CreateTransformStream(
+startAlgorithm, transformAlgorithm, flushAlgorithm, writableHighWaterMark,
+writableSizeAlgorithm, readableHighWaterMark, readableSizeAlgorithm) {
+if (writableHighWaterMark === undefined) {
+writableHighWaterMark = 1;
+}
+if (writableSizeAlgorithm === undefined) {
+writableSizeAlgorithm = () => 1;
+}
+if (readableHighWaterMark === undefined) {
+readableHighWaterMark = 0;
+}
+if (readableSizeAlgorithm === undefined) {
+readableSizeAlgorithm = () => 1;
+}
+const stream = ObjectCreate(TransformStream_prototype);
+const startPromise = v8.createPromise();
+InitializeTransformStream(
+stream, startPromise, writableHighWaterMark, writableSizeAlgorithm,
+readableHighWaterMark, readableSizeAlgorithm);
+const controller = ObjectCreate(TransformStreamDefaultController_prototype);
+SetUpTransformStreamDefaultController(
+stream, controller, transformAlgorithm, flushAlgorithm);
+const startResult = startAlgorithm();
+resolvePromise(startPromise, startResult);
+return stream;
+}
+function InitializeTransformStream(
+stream, startPromise, writableHighWaterMark, writableSizeAlgorithm,
+readableHighWaterMark, readableSizeAlgorithm) {
+const startAlgorithm = () => startPromise;
+const writeAlgorithm = chunk =>
+TransformStreamDefaultSinkWriteAlgorithm(stream, chunk);
+const abortAlgorithm = reason =>
+TransformStreamDefaultSinkAbortAlgorithm(stream, reason);
+const closeAlgorithm = () =>
+TransformStreamDefaultSinkCloseAlgorithm(stream);
+stream[_writable] = binding.CreateWritableStream(
+startAlgorithm, writeAlgorithm, closeAlgorithm, abortAlgorithm,
+writableHighWaterMark, writableSizeAlgorithm);
+const pullAlgorithm = () =>
+TransformStreamDefaultSourcePullAlgorithm(stream);
+const cancelAlgorithm = reason => {
+TransformStreamErrorWritableAndUnblockWrite(stream, reason);
+return Promise_resolve(undefined);
+};
+stream[_readable] = binding.CreateReadableStream(
+startAlgorithm, pullAlgorithm, cancelAlgorithm, readableHighWaterMark,
+readableSizeAlgorithm, false);
+stream[_backpressure] = undefined;
+stream[_backpressureChangePromise] = undefined;
+TransformStreamSetBackpressure(stream, true);
+stream[_transformStreamController] = undefined;
 }
 function IsTransformStream(x) {
 return hasOwnPropertyNoThrow(x, _transformStreamController);
@@ -8369,14 +6928,8 @@ stream[_backpressureChangePromise] = v8.createPromise();
 stream[_backpressure] = backpressure;
 }
 class TransformStreamDefaultController {
-constructor(stream) {
-if (!IsTransformStream(stream)) {
+constructor() {
 throw new TypeError(streamErrors.illegalConstructor);
-}
-if (stream[_transformStreamController] !== undefined) {
-throw new TypeError(streamErrors.illegalConstructor);
-}
-this[_controlledTransformStream] = stream;
 }
 get desiredSize() {
 if (!IsTransformStreamDefaultController(this)) {
@@ -8406,8 +6959,49 @@ throw new TypeError(streamErrors.illegalInvocation);
 TransformStreamDefaultControllerTerminate(this);
 }
 }
+const TransformStreamDefaultController_prototype =
+TransformStreamDefaultController.prototype;
 function IsTransformStreamDefaultController(x) {
 return hasOwnPropertyNoThrow(x, _controlledTransformStream);
+}
+function SetUpTransformStreamDefaultController(
+stream, controller, transformAlgorithm, flushAlgorithm) {
+controller[_controlledTransformStream] = stream;
+stream[_transformStreamController] = controller;
+controller[_transformAlgorithm] = transformAlgorithm;
+controller[_flushAlgorithm] = flushAlgorithm;
+}
+function SetUpTransformStreamDefaultControllerFromTransformer(
+stream, transformer) {
+const controller = ObjectCreate(TransformStreamDefaultController_prototype);
+let transformAlgorithm;
+const transformMethod = transformer.transform;
+if (transformMethod !== undefined) {
+if (typeof transformMethod !== 'function') {
+throw new TypeError('transformer.transform is not a function');
+}
+transformAlgorithm = chunk => {
+const transformPromise =
+PromiseCall2(transformMethod, transformer, chunk, controller);
+return thenPromise(transformPromise, undefined, e => {
+TransformStreamError(stream, e);
+throw e;
+});
+};
+} else {
+transformAlgorithm = chunk => {
+try {
+TransformStreamDefaultControllerEnqueue(controller, chunk);
+return Promise_resolve();
+} catch (resultValue) {
+return Promise_reject(resultValue);
+}
+};
+}
+const flushAlgorithm = CreateAlgorithmFromUnderlyingMethodPassingController(
+transformer, 'flush', 0, controller, 'transformer.flush');
+SetUpTransformStreamDefaultController(
+stream, controller, transformAlgorithm, flushAlgorithm);
 }
 function TransformStreamDefaultControllerEnqueue(controller, chunk) {
 const stream = controller[_controlledTransformStream];
@@ -8443,18 +7037,8 @@ binding.ReadableStreamDefaultControllerClose(readableController);
 const error = new TypeError(errStreamTerminated);
 TransformStreamErrorWritableAndUnblockWrite(stream, error);
 }
-class TransformStreamDefaultSink {
-constructor(stream, startPromise) {
-this[_ownerTransformStream] = stream;
-this[_startPromise] = startPromise;
-}
-start() {
-const startPromise = this[_startPromise];
-this[_startPromise] = undefined;
-return startPromise;
-}
-write(chunk) {
-const stream = this[_ownerTransformStream];
+function TransformStreamDefaultSinkWriteAlgorithm(stream, chunk) {
+const controller = stream[_transformStreamController];
 if (stream[_backpressure]) {
 const backpressureChangePromise = stream[_backpressureChangePromise];
 return thenPromise(backpressureChangePromise, () => {
@@ -8462,21 +7046,18 @@ const writable = stream[_writable];
 if (binding.isWritableStreamErroring(writable)) {
 throw binding.getWritableStreamStoredError(writable);
 }
-return TransformStreamDefaultSinkTransform(this, chunk);
+return controller[_transformAlgorithm](chunk);
 });
 }
-return TransformStreamDefaultSinkTransform(this, chunk);
+return controller[_transformAlgorithm](chunk);
 }
-abort() {
-const e = new TypeError(errWritableStreamAborted);
-TransformStreamError(this[_ownerTransformStream], e);
+function TransformStreamDefaultSinkAbortAlgorithm(stream, reason) {
+TransformStreamError(stream, reason);
+return Promise_resolve();
 }
-close() {
-const stream = this[_ownerTransformStream];
+function TransformStreamDefaultSinkCloseAlgorithm(stream) {
 const readable = stream[_readable];
-const flushPromise = PromiseCallOrNoop1(
-stream[_transformer], 'flush', stream[_transformStreamController],
-'transformer.flush');
+const flushPromise = stream[_transformStreamController][_flushAlgorithm]();
 return thenPromise(
 flushPromise,
 () => {
@@ -8495,53 +7076,9 @@ TransformStreamError(stream, r);
 throw binding.getReadableStreamStoredError(readable);
 });
 }
-}
-function TransformStreamDefaultSinkInvokeTransform(stream, chunk) {
-const controller = stream[_transformStreamController];
-const transformer = stream[_transformer];
-const method = transformer.transform;
-if (method === undefined) {
-TransformStreamDefaultControllerEnqueue(controller, chunk);
-return undefined;
-}
-if (typeof method !== 'function') {
-throw new TypeError(templateErrorIsNotAFunction('transform'));
-}
-return Function_call(method, transformer, chunk, controller);
-}
-function TransformStreamDefaultSinkTransform(sink, chunk) {
-const stream = sink[_ownerTransformStream];
-let transformPromise;
-try {
-transformPromise = Promise_resolve(
-TransformStreamDefaultSinkInvokeTransform(stream, chunk));
-} catch (e) {
-transformPromise = Promise_reject(e);
-}
-return thenPromise(transformPromise, undefined, e => {
-TransformStreamError(stream, e);
-throw e;
-});
-}
-class TransformStreamDefaultSource {
-constructor(stream, startPromise) {
-this[_ownerTransformStream] = stream;
-this[_startPromise] = startPromise;
-}
-start() {
-const startPromise = this[_startPromise];
-this[_startPromise] = undefined;
-return startPromise;
-}
-pull() {
-const stream = this[_ownerTransformStream];
+function TransformStreamDefaultSourcePullAlgorithm(stream) {
 TransformStreamSetBackpressure(stream, false);
 return stream[_backpressureChangePromise];
-}
-cancel(reason) {
-TransformStreamErrorWritableAndUnblockWrite(
-this[_ownerTransformStream], reason);
-}
 }
 defineProperty(global, 'TransformStream', {
 value: TransformStream,
@@ -8549,4 +7086,6 @@ enumerable: false,
 configurable: true,
 writable: true
 });
+binding.CreateTransformStream = CreateTransformStream;
 });
+ dummy<(function() {})
