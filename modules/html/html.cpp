@@ -83,6 +83,7 @@ void init(core::module_dependencies dependencies)
 		settings.no_sandbox = true;
 		settings.remote_debugging_port = env::properties().get(L"configuration.html.remote-debugging-port", 0);
 		settings.windowless_rendering_enabled = true;
+
 		// CefString(&settings.browser_subprocess_path).FromASCII("cgbrowserhost.exe"); // Currently Disabled, as the subprocess needs the browserApp implementation, or 
 																						// at least a stripped down version for IPC.
 		CefInitialize(main_args, settings, CefRefPtr<CefApp>(new browserApp), nullptr);

@@ -76,12 +76,23 @@ void browserApp::OnBeforeCommandLineProcessing(const CefString &process_type, Ce
 	command_line->AppendSwitch("enable-begin-frame-scheduling");
 	command_line->AppendSwitch("enable-media-stream");
 
+	//command_line->AppendSwitch("disable-extensions");
+	//command_line->AppendSwitch("disable-pdf-extension");
+
+	command_line->AppendSwitchWithValue("disable-features", "AsyncWheelEvents, SurfaceSynchronization, TouchpadAndWheelScrollLatching");
+
 	if (process_type.empty()) {
 
 		command_line->AppendSwitch("disable-gpu");
 		command_line->AppendSwitch("disable-gpu-compositing");
 		command_line->AppendSwitch("disable-d3d11");
 
+		//command_line->AppendSwitch("off-screen-rendering-enabled");
+		//command_line->AppendSwitchWithValue("off-screen-frame-rate", "60");
+		
+		
+
+		//command_line->AppendSwitch("disable-gpu-vsync");
 		// Breaks stuff currently - needs further invistagation on CeF Patches && Chrome
 		// As when disabling vsync, with offscreen rendering OnPaint won't get called..
 		//command_line->AppendSwitchWithValue("disable-gpu-vsync", "gpu");
